@@ -1,0 +1,61 @@
+# ============================================================================
+#  .wslconfig  ->  se copia a  %USERPROFILE%\.wslconfig
+#  Ajustes GLOBALES de la VM de WSL2 (afectan a TODAS las distros WSL2).
+#  Tras editar: ejecuta  wsl --shutdown  y reabre la distro
+#  (la "regla de los ~8 segundos" de Microsoft para recargar la config).
+#
+#  Optimizado para: OpenCode + Docker.
+#  Referencia oficial: https://learn.microsoft.com/windows/wsl/wsl-config
+# ============================================================================
+
+[wsl2]
+
+# RAM maxima para la VM de WSL2. Por defecto WSL toma el 50% del total del PC.
+# 4GB es conservador: si tu equipo tiene >=16GB y vas a usar Docker, sube a 6-8GB.
+memory=4GB
+
+# Nucleos logicos asignados a la VM. Por defecto = todos los de Windows.
+processors=4
+
+# Virtualizacion anidada: permite correr VMs/containers anidados dentro de WSL2.
+# Necesario para ciertos escenarios de Docker/Kubernetes. (Default ya es true en Win11.)
+nestedVirtualization=true
+
+# WSLg: ejecutar aplicaciones Linux con interfaz grafica. (Default true.)
+guiApplications=true
+
+# Red en modo "espejo": WSL comparte la pila de red de Windows.
+#  -> el localhost de WSL == el localhost de Windows (clave para que el
+#     navegador de Windows alcance opencode.local sin reglas raras),
+#  -> mejor compatibilidad con VPN y con Docker.
+#  Requiere Windows 11 22H2 o superior (tu build lo cumple).
+networkingMode=mirrored
+
+# Tunel de DNS: enruta las consultas DNS de WSL a traves de Windows.
+# Mejora la resolucion bajo VPN / redes corporativas.
+dnsTunneling=true
+
+# Usa automaticamente la configuracion de proxy HTTP de Windows dentro de WSL.
+autoProxy=true
+
+# El Firewall de Windows aplica tambien al trafico de WSL (recomendado por seguridad).
+firewall=true
+
+[experimental]
+
+# Recupera RAM de la VM cuando deja de usarse:
+#   gradual   = liberacion lenta y suave (recomendado para uso interactivo)
+#   dropCache = libera de golpe (este es el DEFAULT real de WSL)
+#   disabled  = nunca libera
+# Importante con Docker, que tiende a retener memoria.
+# NOTA: esta clave va en [experimental] y SIEMPRE necesita un valor.
+autoMemoryReclaim=gradual
+
+# Hace que los discos VHDX nuevos sean "sparse": se autocompactan y no
+# crecen sin control. Muy util con Docker (las imagenes inflan el disco).
+sparseVhd=true
+
+# (Opcional) Permite que apps Linux escuchen en puertos que Windows ya usa,
+# util en modo mirrored si el puerto 80 del proxy chocara con algo de Windows.
+# Descomenta y ajusta si lo necesitas:
+# ignoredPorts=80,443

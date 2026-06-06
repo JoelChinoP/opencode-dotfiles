@@ -1,0 +1,10 @@
+# Higiene del propio repo de dotfiles: los scripts que se ejecutan dentro de
+# WSL/Debian DEBEN tener finales de linea LF, aunque se clonen en Windows.
+*.sh            text eol=lf
+Caddyfile       text eol=lf
+*.conf          text eol=lf
+config/*.env    text eol=lf
+
+# Los scripts de Windows son indiferentes; se dejan a discrecion de git.
+*.ps1           text
+*.cmd           text eol=crlf
