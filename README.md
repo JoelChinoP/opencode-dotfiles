@@ -1,15 +1,22 @@
 # opencode-dotfiles
 
-Instalación y configuración automatizada de **OpenCode** en **Windows** mediante
-**WSL2 + Debian**, optimizada para máxima compatibilidad y mínima pérdida de
-rendimiento, con `opencode web` publicado tras un dominio local
-(`http://opencode.local`) vía **nginx** o **Caddy**.
+Instalación y configuración automatizada de **OpenCode** en **Windows**
+(vía **WSL2 + Debian**) y en **Arch Linux** (nativo), optimizada para máxima
+compatibilidad y mínima pérdida de rendimiento. Publica `opencode web` tras un
+dominio local (`http://opencode.local`) vía **nginx** o **Caddy**, expone el API
+(`opencode serve`) para la **app de escritorio**, y deja todo como servicios
+**systemd** que arrancan solos.
 
 > Basado en la documentación oficial de OpenCode (recomienda WSL en Windows por
 > "better file system performance, full terminal support, and compatibility")
 > y en la documentación oficial de Microsoft para `.wslconfig`.
 
+- **Windows** → sección [Windows (WSL2 + Debian)](#windows-wsl2--debian).
+- **Arch Linux** → sección [Arch Linux (nativo)](#arch-linux-nativo).
+
 ---
+
+# Windows (WSL2 + Debian)
 
 ## ¿Qué hace este setup?
 
@@ -18,14 +25,18 @@ rendimiento, con `opencode web` publicado tras un dominio local
 3. Dentro de Debian instala **nano, git, curl** y **OpenCode**.
 4. Aplica la configuración de git pedida:
    `core.fileMode=false` y `core.autocrlf=input`.
-5. Levanta **`opencode web`** como **servicio systemd** que arranca solo con la distro.
-6. Publica ese servidor tras **`http(s)://opencode.local`** con **nginx** *o* **Caddy**
-   (lo eliges en la instalación; nunca ambos, para no malgastar recursos).
-7. Crea atajos **`opencode`** y **`oc`** en el PATH de Windows: corren dentro de
+5. Levanta dos **servicios systemd** que arrancan solos con la distro:
+   - **`opencode web`** → la **interfaz web** (navegador).
+   - **`opencode serve`** → el **API** al que se conecta la **app de escritorio**.
+6. Publica `opencode web` tras **`http(s)://opencode.local`** con **nginx** *o*
+   **Caddy** (lo eliges en la instalación; nunca ambos, para no malgastar recursos).
+7. (Opcional) Instala la **app de escritorio** de OpenCode (Scoop) y la apunta al
+   `opencode serve` de WSL.
+8. Crea atajos **`opencode`** y **`oc`** en el PATH de Windows: corren dentro de
    Debian y vuelven a Windows al terminar (no escribes `wsl` cada vez).
 
-Alcance: cubre desde cero hasta poder **lanzar OpenCode** y abrir su web. No
-configura el proveedor de IA (eso se hace luego con `opencode auth login`).
+Alcance: cubre desde cero hasta poder **lanzar OpenCode** (TUI, web y escritorio).
+No configura el proveedor de IA (eso se hace luego con `opencode auth login`).
 
 ---
 
@@ -65,17 +76,26 @@ Al terminar, abre una **terminal nueva** y ejecuta `opencode`, o entra a
 ```
 opencode-dotfiles/
 ├─ config/
-│  └─ dotfiles.env            # Configuración central editable (distro, puerto, dominio...)
+│  └─ dotfiles.env            # Configuración central editable (compartida Win/Arch)
 ├─ windows/
 │  ├─ .wslconfig             # Plantilla -> %USERPROFILE%\.wslconfig (ajustes de la VM)
 │  ├─ common.ps1             # Utilidades compartidas
-│  ├─ install.ps1            # Orquestador (auto-eleva) -> 01, 02, 03
+│  ├─ install.ps1            # Orquestador (auto-eleva) -> 01..04
 │  ├─ 01-setup-wsl.ps1       # WSL2 + Debian + .wslconfig + systemd + hosts   [Admin]
 │  ├─ 02-provision.ps1       # Copia y ejecuta provision.sh dentro de Debian
-│  └─ 03-launchers.ps1       # Atajos 'opencode' y 'oc' en el PATH de Windows
-└─ wsl/
-   ├─ provision.sh           # Provisión dentro de Debian (paquetes, opencode, proxy, systemd)
-   ├─ opencode-web.sh        # Lanzador de 'opencode web' (lo usa el servicio systemd)
+│  ├─ 03-launchers.ps1       # Atajos 'opencode' y 'oc' en el PATH de Windows
+│  └─ 04-desktop.ps1         # App de escritorio (Scoop) -> conecta a opencode serve
+├─ wsl/
+│  ├─ provision.sh           # Provisión dentro de Debian (paquetes, opencode, proxy, systemd)
+│  ├─ opencode-web.sh        # Lanzador de 'opencode web'  (servicio systemd)
+│  ├─ opencode-serve.sh      # Lanzador de 'opencode serve' API (servicio systemd)
+│  ├─ nginx-opencode.conf    # Plantilla del sitio nginx (http)
+│  └─ Caddyfile              # Plantilla de Caddy (https con TLS local)
+└─ arch/                     # Setup para Arch Linux nativo (ver su sección)
+   ├─ install.sh             # Punto de entrada
+   ├─ provision.sh           # Instala opencode, proxy, deps GUI y servicios systemd
+   ├─ opencode-web.sh        # Lanzador de 'opencode web'
+   ├─ opencode-serve.sh      # Lanzador de 'opencode serve'
    ├─ nginx-opencode.conf    # Plantilla del sitio nginx (http)
    └─ Caddyfile              # Plantilla de Caddy (https con TLS local)
 ```
@@ -91,6 +111,7 @@ Todo lo ajustable vive aquí. Cámbialo **antes** de instalar:
 | `WSL_DISTRO` | `Debian` | Distribución WSL a usar/instalar. |
 | `OPENCODE_WORKDIR` | `code` | Carpeta de trabajo del servidor, en `~/code` (ext4 nativo, rápido). |
 | `OPENCODE_PORT` | `47917` | Puerto interno (poco usado) de `opencode web`, solo en `127.0.0.1`. |
+| `OPENCODE_SERVE_PORT` | `4096` | Puerto del API `opencode serve` para la **app de escritorio**/SDK. |
 | `OPENCODE_DOMAIN` | `opencode.local` | Dominio local para el navegador. |
 | `OPENCODE_SERVER_PASSWORD` | *(vacío)* | Basic Auth opcional (usuario `opencode`). Recomendado si expones el puerto. |
 
@@ -166,6 +187,42 @@ oc opencode upgrade                   # actualizar OpenCode
 
 ---
 
+## App de escritorio (Windows)
+
+La app de escritorio se instala en **Windows** (con Scoop) y se conecta al
+servidor **`opencode serve`** que corre dentro de **WSL**. Lo hace el paso
+`04-desktop.ps1` (el orquestador lo ofrece al final; responde *Sí*).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\04-desktop.ps1
+```
+
+**Cómo se le indica el servidor (importante).** Contrario a la creencia común,
+**no** se hace con una variable de entorno de "host". Los métodos oficiales son:
+
+1. **Archivo `opencode.jsonc`** (lo que automatiza este repo). Se crea en
+   `%USERPROFILE%\.config\opencode\opencode.jsonc` con una sección `server`:
+   ```jsonc
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "server": { "hostname": "127.0.0.1", "port": 4096 }
+   }
+   ```
+   Con `networkingMode=mirrored`, `127.0.0.1:4096` de Windows = el `opencode serve`
+   de WSL.
+2. **Ajuste in-app**: en la pantalla *Home*, clic en el nombre del servidor (con
+   el punto de estado) → *Server picker* → fijas la URL `http://localhost:4096`.
+
+> ⚠️ La variable **`OPENCODE_PORT`** **no** sirve para apuntar a un host remoto:
+> si está definida en tu entorno de Windows, la app intentará levantar su **propio
+> servidor local** en ese puerto y fallará la conexión. `04-desktop.ps1` te avisa
+> si la detecta. Bórrala con `setx OPENCODE_PORT ""` si da problemas.
+
+Si la app muestra *"Connection Failed"* o se queda en el splash: arranca WSL una
+vez (`oc`) para que `opencode-serve` esté levantado, y revisa la URL del servidor.
+
+---
+
 ## Cambiar de proxy o de puerto/dominio después
 
 1. Edita `config/dotfiles.env`.
@@ -220,3 +277,73 @@ Si además vas a editar/commitear el mismo repo desde el git de **Windows**
 (p. ej. VSCode nativo sobre `/mnt/...`), considera replicar `autocrlf=input` en
 PowerShell y añadir un `.gitattributes` (`* text=auto eol=lf`). Como aquí el
 trabajo vive en `~/code` (nativo de WSL), normalmente no hace falta.
+
+---
+---
+
+# Arch Linux (nativo)
+
+En Arch es **mucho más simple**: es Linux nativo, así que **no** hay WSL, ni
+`.wslconfig`, ni cruce de mundos, ni lanzadores de Windows. systemd ya está
+activo y el sistema de archivos es nativo (máximo rendimiento sin trucos).
+
+## Qué hace
+
+1. Instala **OpenCode** con el comando recomendado:
+   - `paru -S opencode-bin` (o `yay`), AUR siempre al día, si tienes un *AUR helper*.
+   - si no, `sudo pacman -S opencode` (repo oficial *extra*, estable).
+2. Aplica la config de git: `core.fileMode=false` y `core.autocrlf=input`.
+3. Instala las **dependencias gráficas** del portapapeles para el TUI:
+   `wl-clipboard` (Wayland) o `xclip` (X11), según tu sesión.
+4. Levanta los servicios systemd **`opencode-web`** (navegador) y
+   **`opencode-serve`** (API), igual que en Windows.
+5. Publica `opencode web` tras **`http(s)://opencode.local`** con **nginx** *o*
+   **Caddy** (lo eliges; nunca ambos).
+
+## Instalación
+
+```bash
+git clone <url-de-este-repo> ~/opencode-dotfiles
+cd ~/opencode-dotfiles
+bash arch/install.sh
+```
+
+Se te preguntará el reverse proxy (nginx por defecto, o Caddy para https).
+Ejecútalo como **tu usuario normal** (no root); pedirá `sudo` cuando haga falta.
+
+> Usa la misma `config/dotfiles.env` que Windows (puerto, dominio, etc.). En Arch
+> se ignora `WSL_DISTRO`.
+
+## Interfaz gráfica y "variables"
+
+- La **GUI principal** en Arch es la **web UI** en `http(s)://opencode.local`
+  (navegador) — idéntico a Windows.
+- Para el **TUI**, las "variables/dependencias gráficas" que necesitas son
+  `wl-clipboard`/`xclip` (los instala el provision). OpenCode los usa
+  automáticamente para pegar imágenes; **no necesitas exportar variables a mano**.
+- Como aquí todo es **local** (misma máquina), **no** hay que configurar ningún
+  host remoto: el TUI y la web trabajan en `~/code` directamente. La sección
+  `server` de `opencode.jsonc` (host/puerto) solo hace falta si conectas un
+  cliente/app a un `serve` remoto.
+
+## Uso diario (Arch)
+
+```bash
+opencode                              # TUI, ejecútalo dentro de ~/code
+systemctl status opencode-web opencode-serve
+journalctl -u opencode-web -e         # logs
+opencode auth login                   # proveedor de IA
+opencode upgrade                      # actualizar (o: paru -S opencode-bin)
+```
+
+Navegador → `http://opencode.local` (o `https://` si elegiste Caddy).
+
+## Solución de problemas (Arch)
+
+- **`opencode.local` no carga**: `systemctl status opencode-web` y el proxy;
+  confirma `127.0.0.1 opencode.local` en `/etc/hosts`.
+- **nginx no toma el sitio**: en Arch, `nginx.conf` no incluye `conf.d` por
+  defecto; el provision añade ese `include` (con backup). Verifica `nginx -t`.
+- **HTTPS con Caddy**: la CA local está en
+  `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`. Impórtala
+  en tu navegador para evitar el aviso de certificado.

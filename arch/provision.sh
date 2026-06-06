@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
-# provision.sh - se ejecuta DENTRO de Debian (WSL).
-# Instala paquetes, OpenCode, aplica la config de git pedida, levanta el
-# reverse proxy elegido (nginx o Caddy) y crea el servicio systemd que arranca
-# `opencode web` automaticamente con la distro.
+# provision.sh - instala y configura OpenCode en Arch Linux (nativo).
+# Instala opencode (repo oficial o AUR), aplica la config de git, instala las
+# dependencias del portapapeles grafico, levanta el reverse proxy elegido
+# (nginx o Caddy) y crea los servicios systemd (web + serve) que arrancan solos.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1090
-source "$DIR/dotfiles.env"
+REPO="$(cd "$DIR/.." && pwd)"
 
+# Ruta estable para los scripts/config que usaran los servicios systemd.
+DEST="$HOME/.config/opencode-dotfiles"
+mkdir -p "$DEST"
+cp -f "$REPO/config/dotfiles.env" "$DEST/"
+cp -f "$DIR/opencode-web.sh" "$DIR/opencode-serve.sh" "$DEST/"
+cp -f "$DIR/nginx-opencode.conf" "$DIR/Caddyfile" "$DEST/"
+# Por si el repo se clono en Windows: normaliza finales de linea.
+find "$DEST" -type f -exec sed -i 's/\r$//' {} +
+chmod +x "$DEST/"*.sh
+
+# shellcheck disable=SC1090
+source "$DEST/dotfiles.env"
 : "${OPENCODE_WORKDIR:=code}"
 : "${OPENCODE_PORT:=47917}"
 : "${OPENCODE_SERVE_PORT:=4096}"
@@ -18,48 +29,43 @@ source "$DIR/dotfiles.env"
 USER_NAME="$(id -un)"
 USER_HOME="$HOME"
 WORKDIR="$USER_HOME/$OPENCODE_WORKDIR"
+echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  Web=$OPENCODE_PORT  API=$OPENCODE_SERVE_PORT  Dominio=$OPENCODE_DOMAIN"
 
-echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  Puerto=$OPENCODE_PORT  Dominio=$OPENCODE_DOMAIN"
-
-# --- Aviso si systemd no esta activo (deberia estarlo tras 01-setup-wsl.ps1) ---
-if [ "$(ps -p 1 -o comm= 2>/dev/null)" != "systemd" ]; then
-    echo "ADVERTENCIA: systemd no parece ser PID 1. Ejecuta 01-setup-wsl.ps1 (habilita" >&2
-    echo "             systemd y reinicia WSL) antes de este paso." >&2
-fi
-
-# --- 1) Paquetes base ---
-echo "==> Instalando paquetes base (nano, git, curl, ca-certificates, unzip)"
-sudo apt-get update -y
-sudo apt-get install -y nano git curl ca-certificates unzip
-
-# --- 2) OpenCode ---
-if ! command -v opencode >/dev/null 2>&1 && [ ! -x "$USER_HOME/.opencode/bin/opencode" ]; then
+# --- 1) OpenCode (comando recomendado) ---
+if ! command -v opencode >/dev/null 2>&1; then
     echo "==> Instalando OpenCode"
-    curl -fsSL https://opencode.ai/install | bash
+    if command -v paru >/dev/null 2>&1; then
+        paru -S --needed --noconfirm opencode-bin      # AUR, siempre al dia
+    elif command -v yay >/dev/null 2>&1; then
+        yay -S --needed --noconfirm opencode-bin       # AUR, siempre al dia
+    else
+        sudo pacman -S --needed --noconfirm opencode   # repo oficial (extra)
+    fi
 fi
-OPENCODE_BIN="$(command -v opencode || true)"
-[ -z "$OPENCODE_BIN" ] && [ -x "$USER_HOME/.opencode/bin/opencode" ] && OPENCODE_BIN="$USER_HOME/.opencode/bin/opencode"
-if [ -z "$OPENCODE_BIN" ]; then
-    echo "ERROR: no se pudo localizar el binario de opencode." >&2
-    exit 1
-fi
-echo "==> OpenCode: $OPENCODE_BIN  ($("$OPENCODE_BIN" --version 2>/dev/null || echo '?'))"
+echo "==> OpenCode: $(command -v opencode)  ($(opencode --version 2>/dev/null || echo '?'))"
 
-# --- 3) Configuracion de git pedida ---
+# --- 2) Configuracion de git pedida ---
 echo "==> git config global: core.fileMode=false  core.autocrlf=input"
 git config --global core.fileMode false
 git config --global core.autocrlf input
 
-# --- 4) Carpeta de trabajo (filesystem nativo, rapido) ---
+# --- 3) Dependencias del portapapeles grafico (para pegar imagenes en el TUI) ---
+echo "==> Dependencias graficas (clipboard)"
+case "${XDG_SESSION_TYPE:-}" in
+    wayland) sudo pacman -S --needed --noconfirm wl-clipboard ;;
+    x11)     sudo pacman -S --needed --noconfirm xclip ;;
+    *)       sudo pacman -S --needed --noconfirm wl-clipboard xclip ;;
+esac
+
+# --- 4) Carpeta de trabajo ---
 mkdir -p "$WORKDIR"
 
-# --- 5) /etc/hosts dentro de WSL: dominio -> 127.0.0.1 ---
+# --- 5) /etc/hosts: dominio -> 127.0.0.1 ---
 if ! grep -q -- "$OPENCODE_DOMAIN" /etc/hosts; then
     echo "127.0.0.1 $OPENCODE_DOMAIN" | sudo tee -a /etc/hosts >/dev/null
     echo "==> /etc/hosts: anadido 127.0.0.1 $OPENCODE_DOMAIN"
 fi
 
-# Sustituye los marcadores __PORT__ / __DOMAIN__ de las plantillas.
 render() { sed -e "s|__PORT__|${OPENCODE_PORT}|g" -e "s|__DOMAIN__|${OPENCODE_DOMAIN}|g" "$1"; }
 
 # --- 6) Reverse proxy: lo decide el usuario (nginx http / Caddy https), no ambos ---
@@ -73,31 +79,30 @@ PROXY_CHOICE="${PROXY_CHOICE:-N}"
 if [[ "$PROXY_CHOICE" =~ ^[Cc] ]]; then
     echo "==> Instalando Caddy (y desactivando nginx si estaba)"
     sudo systemctl disable --now nginx 2>/dev/null || true
-    sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https gnupg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-        | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-        | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-    sudo apt-get update -y
-    sudo apt-get install -y caddy
-    render "$DIR/Caddyfile" | sudo tee /etc/caddy/Caddyfile >/dev/null
+    sudo pacman -S --needed --noconfirm caddy
+    sudo mkdir -p /etc/caddy
+    render "$DEST/Caddyfile" | sudo tee /etc/caddy/Caddyfile >/dev/null
     sudo systemctl enable --now caddy
     sudo systemctl restart caddy
     PROXY_NAME="caddy"; SCHEME="https"
 else
     echo "==> Instalando nginx (y desactivando Caddy si estaba)"
     sudo systemctl disable --now caddy 2>/dev/null || true
-    sudo apt-get install -y nginx
-    render "$DIR/nginx-opencode.conf" | sudo tee /etc/nginx/sites-available/opencode >/dev/null
-    sudo ln -sf /etc/nginx/sites-available/opencode /etc/nginx/sites-enabled/opencode
-    sudo rm -f /etc/nginx/sites-enabled/default
+    sudo pacman -S --needed --noconfirm nginx
+    # En Arch, nginx.conf NO incluye conf.d por defecto (a diferencia de Debian).
+    sudo cp -n /etc/nginx/nginx.conf "/etc/nginx/nginx.conf.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+    if ! grep -qE 'include[[:space:]]+.*conf\.d/\*\.conf' /etc/nginx/nginx.conf; then
+        sudo sed -i '0,/http[[:space:]]*{/s//http {\n    include \/etc\/nginx\/conf.d\/*.conf;/' /etc/nginx/nginx.conf
+    fi
+    sudo mkdir -p /etc/nginx/conf.d
+    render "$DEST/nginx-opencode.conf" | sudo tee /etc/nginx/conf.d/opencode.conf >/dev/null
     sudo nginx -t
     sudo systemctl enable --now nginx
     sudo systemctl restart nginx
     PROXY_NAME="nginx"; SCHEME="http"
 fi
 
-# --- 7) Servicio systemd: opencode web autoarranca con la distro ---
+# --- 7) Servicios systemd: opencode web (navegador) + opencode serve (app/SDK) ---
 echo "==> Creando servicio systemd 'opencode-web'"
 sudo tee /etc/systemd/system/opencode-web.service >/dev/null <<EOF
 [Unit]
@@ -113,7 +118,7 @@ Environment=HOME=${USER_HOME}
 Environment=BROWSER=/bin/true
 Environment=OPENCODE_PORT=${OPENCODE_PORT}
 Environment=OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
-ExecStart=${DIR}/opencode-web.sh
+ExecStart=${DEST}/opencode-web.sh
 Restart=on-failure
 RestartSec=3
 
@@ -121,7 +126,6 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-# --- 8) Servicio systemd: opencode serve (API) para la APP DE ESCRITORIO ---
 echo "==> Creando servicio systemd 'opencode-serve' (API para la app de escritorio)"
 sudo tee /etc/systemd/system/opencode-serve.service >/dev/null <<EOF
 [Unit]
@@ -136,7 +140,7 @@ WorkingDirectory=${WORKDIR}
 Environment=HOME=${USER_HOME}
 Environment=OPENCODE_SERVE_PORT=${OPENCODE_SERVE_PORT}
 Environment=OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
-ExecStart=${DIR}/opencode-serve.sh
+ExecStart=${DEST}/opencode-serve.sh
 Restart=on-failure
 RestartSec=3
 
@@ -153,14 +157,16 @@ sudo systemctl restart opencode-serve.service
 
 echo ""
 echo "============================================================"
-echo " Provision completado."
+echo " Provision completado (Arch Linux)."
 echo "   Proxy:        ${PROXY_NAME}  ->  ${SCHEME}://${OPENCODE_DOMAIN}"
 echo "   Web UI:       127.0.0.1:${OPENCODE_PORT}  (navegador, via proxy)"
 echo "   API (serve):  127.0.0.1:${OPENCODE_SERVE_PORT}  (app de escritorio / SDK)"
+echo "   TUI:          ejecuta  opencode  en  ${WORKDIR}"
 echo "   Servicios:    systemctl status opencode-web opencode-serve ${PROXY_NAME}"
 if [ "$SCHEME" = "https" ]; then
     echo ""
-    echo " NOTA Caddy/HTTPS: para que el navegador de Windows confie en el"
-    echo " certificado, importa la CA local de Caddy (ver README)."
+    echo " NOTA Caddy/HTTPS: la CA local de Caddy esta en"
+    echo "   /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"
+    echo " Importala en tu navegador si quieres evitar el aviso de certificado."
 fi
 echo "============================================================"

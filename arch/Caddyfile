@@ -1,0 +1,11 @@
+# Caddyfile - reverse proxy https://__DOMAIN__ -> 127.0.0.1:__PORT__
+# En Arch se instala en /etc/caddy/Caddyfile (provision.sh sustituye los marcadores).
+# `tls internal` hace que Caddy genere y administre un certificado TLS local.
+# El soporte de WebSocket es automatico; flush_interval -1 = streaming SSE.
+__DOMAIN__ {
+    tls internal
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:__PORT__ {
+        flush_interval -1
+    }
+}
