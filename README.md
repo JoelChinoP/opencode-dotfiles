@@ -25,11 +25,13 @@ dominio local (`http://opencode.local`) vía **nginx** o **Caddy**, expone el AP
 3. Dentro de Debian instala **nano, git, curl** y **OpenCode**.
 4. Aplica la configuración de git pedida:
    `core.fileMode=false` y `core.autocrlf=input`.
-5. Levanta dos **servicios systemd** que arrancan solos con la distro:
-   - **`opencode web`** → la **interfaz web** (navegador).
+5. Levanta **un** servicio systemd permanente que arranca solo con la distro:
    - **`opencode serve`** → el **API** al que se conecta la **app de escritorio**.
-6. Publica `opencode web` tras **`http(s)://opencode.local`** con **nginx** *o*
-   **Caddy** (lo eliges en la instalación; nunca ambos, para no malgastar recursos).
+   - La **interfaz web** (`opencode web`) **no** corre como servicio: se usa
+     **bajo demanda** (ver [Usar la web y añadir proyectos](#usar-la-web-y-añadir-proyectos)).
+6. Instala **nginx** *o* **Caddy** (lo eliges; nunca ambos) con el dominio
+   **`http(s)://opencode.local`** apuntando al puerto de la web, listo para cuando
+   la lances bajo demanda en ese puerto.
 7. (Opcional) Instala la **app de escritorio** de OpenCode (Scoop) y la apunta al
    `opencode serve` de WSL.
 8. Crea atajos **`opencode`** y **`oc`** en el PATH de Windows: corren dentro de
@@ -87,7 +89,7 @@ opencode-dotfiles/
 │  └─ 04-desktop.ps1         # App de escritorio (Scoop) -> conecta a opencode serve
 ├─ wsl/
 │  ├─ provision.sh           # Provisión dentro de Debian (paquetes, opencode, proxy, systemd)
-│  ├─ opencode-web.sh        # Lanzador de 'opencode web'  (servicio systemd)
+│  ├─ opencode-web.sh        # Lanzador de 'opencode web' (uso bajo demanda)
 │  ├─ opencode-serve.sh      # Lanzador de 'opencode serve' API (servicio systemd)
 │  ├─ nginx-opencode.conf    # Plantilla del sitio nginx (http)
 │  └─ Caddyfile              # Plantilla de Caddy (https con TLS local)
@@ -171,19 +173,55 @@ de Windows llega a `opencode.local` sin configuración extra de red.
   vuelves a Windows automáticamente.
 - `oc` → abre una shell de Debian (`exit` regresa a Windows).
 - `oc <comando>` → ejecuta un comando en Debian y vuelve. Ej.: `oc git status`.
-- Navegador → `http://opencode.local` (o `https://` si elegiste Caddy).
-
-El servicio `opencode web` arranca solo cuando la distro inicia (systemd).
+- **Web** → bajo demanda (ver abajo). El único servicio permanente es
+  `opencode serve` (para la app de escritorio).
 
 ### Comandos útiles dentro de WSL (`oc`)
 
 ```bash
-oc systemctl status opencode-web      # estado del servidor web
-oc systemctl status nginx             # (o caddy)
-oc journalctl -u opencode-web -e      # logs del servidor
+oc systemctl status opencode-serve    # estado del API (servicio permanente)
+oc systemctl status nginx             # (o caddy) estado del proxy
+oc journalctl -u opencode-serve -e    # logs del API
 oc opencode auth login                # configurar el proveedor de IA
 oc opencode upgrade                   # actualizar OpenCode
 ```
+
+---
+
+## Usar la web y añadir proyectos
+
+A diferencia de la app de escritorio (que tiene un explorador de carpetas nativo),
+**la web no puede "buscar y añadir" un directorio desde el navegador**: un navegador
+no puede abrir el explorador de archivos del sistema ni recorrer el filesystem del
+servidor. Por eso **`opencode web` se ancla al directorio donde lo ejecutas**.
+
+Como consecuencia, **`opencode web` ya no corre como servicio permanente**. Para
+trabajar un proyecto en la web, lo **lanzas en su carpeta**:
+
+```powershell
+# Desde Windows, en la carpeta del proyecto que quieras abrir:
+#   - en el puerto fijo, para acceder por el dominio bonito:
+oc opencode web --port 47917         # luego abre  http(s)://opencode.local
+#   - o sin puerto fijo: opencode elige uno y abre el navegador directamente:
+oc opencode web
+```
+
+> El `47917` es tu `OPENCODE_PORT`. Solo cuando la web corre en ese puerto, el
+> proxy `opencode.local` la sirve; si usas `opencode web` a secas, accede por el
+> `localhost:<puerto>` que abra OpenCode.
+
+**Para "cambiar de proyecto" = ejecutar el comando en otra carpeta.** Dentro de
+WSL puedes ir a cualquier ruta y lanzarlo, por ejemplo:
+
+```bash
+oc                                   # abre shell en Debian
+cd ~/code/otro-proyecto              # o:  cd /mnt/d/repos/mi-proyecto
+opencode web --port 47917            # sirve ESE proyecto en opencode.local
+```
+
+Recuerda que el mejor rendimiento es con proyectos dentro de `~/code` (ext4 nativo).
+El **API** (`opencode serve`) sí queda siempre activo para la app de escritorio;
+ese también opera sobre `~/code` por defecto.
 
 ---
 
@@ -253,8 +291,9 @@ Import-Certificate -FilePath $env:USERPROFILE\caddy-root.crt -CertStoreLocation 
 
 - **`opencode` no se reconoce**: abre una terminal nueva (el PATH se actualiza al
   reabrir).
-- **`opencode.local` no carga**: comprueba `oc systemctl status opencode-web` y el
-  proxy; confirma la línea `127.0.0.1 opencode.local` en
+- **`opencode.local` no carga**: la web es **bajo demanda** — debe estar corriendo
+  `oc opencode web --port 47917`. Comprueba el proxy con `oc systemctl status nginx`
+  (o `caddy`) y la línea `127.0.0.1 opencode.local` en
   `C:\Windows\System32\drivers\etc\hosts`.
 - **Puerto 80 ocupado en Windows**: descomenta `ignoredPorts=80,443` en
   `.wslconfig`, o cambia de proxy/puerto.
@@ -295,10 +334,11 @@ activo y el sistema de archivos es nativo (máximo rendimiento sin trucos).
 2. Aplica la config de git: `core.fileMode=false` y `core.autocrlf=input`.
 3. Instala las **dependencias gráficas** del portapapeles para el TUI:
    `wl-clipboard` (Wayland) o `xclip` (X11), según tu sesión.
-4. Levanta los servicios systemd **`opencode-web`** (navegador) y
-   **`opencode-serve`** (API), igual que en Windows.
-5. Publica `opencode web` tras **`http(s)://opencode.local`** con **nginx** *o*
-   **Caddy** (lo eliges; nunca ambos).
+4. Levanta el servicio systemd permanente **`opencode-serve`** (API para la app
+   de escritorio). La web (`opencode web`) se usa **bajo demanda**, igual que en
+   Windows (ver [Usar la web y añadir proyectos](#usar-la-web-y-añadir-proyectos)).
+5. Instala **nginx** *o* **Caddy** con **`http(s)://opencode.local`** apuntando al
+   puerto de la web (lo eliges; nunca ambos), listo para cuando la lances.
 
 ## Instalación
 
@@ -316,8 +356,8 @@ Ejecútalo como **tu usuario normal** (no root); pedirá `sudo` cuando haga falt
 
 ## Interfaz gráfica y "variables"
 
-- La **GUI principal** en Arch es la **web UI** en `http(s)://opencode.local`
-  (navegador) — idéntico a Windows.
+- La **GUI principal** en Arch es la **web UI** (navegador), que lanzas **bajo
+  demanda** en la carpeta del proyecto con `opencode web` — idéntico a Windows.
 - Para el **TUI**, las "variables/dependencias gráficas" que necesitas son
   `wl-clipboard`/`xclip` (los instala el provision). OpenCode los usa
   automáticamente para pegar imágenes; **no necesitas exportar variables a mano**.
@@ -329,19 +369,22 @@ Ejecútalo como **tu usuario normal** (no root); pedirá `sudo` cuando haga falt
 ## Uso diario (Arch)
 
 ```bash
-opencode                              # TUI, ejecútalo dentro de ~/code
-systemctl status opencode-web opencode-serve
-journalctl -u opencode-web -e         # logs
+opencode                              # TUI, ejecútalo en la carpeta del proyecto
+opencode web --port 47917            # web bajo demanda -> http(s)://opencode.local
+systemctl status opencode-serve       # API permanente (app de escritorio)
+journalctl -u opencode-serve -e       # logs del API
 opencode auth login                   # proveedor de IA
 opencode upgrade                      # actualizar (o: paru -S opencode-bin)
 ```
 
-Navegador → `http://opencode.local` (o `https://` si elegiste Caddy).
+Para la **web** abre el navegador en `http://opencode.local` (o `https://` con
+Caddy) **mientras** `opencode web` esté corriendo en el puerto del dominio.
 
 ## Solución de problemas (Arch)
 
-- **`opencode.local` no carga**: `systemctl status opencode-web` y el proxy;
-  confirma `127.0.0.1 opencode.local` en `/etc/hosts`.
+- **`opencode.local` no carga**: recuerda que la web es **bajo demanda** — debe
+  estar corriendo `opencode web --port 47917`. Revisa el proxy con
+  `systemctl status nginx` (o `caddy`) y `127.0.0.1 opencode.local` en `/etc/hosts`.
 - **nginx no toma el sitio**: en Arch, `nginx.conf` no incluye `conf.d` por
   defecto; el provision añade ese `include` (con backup). Verifica `nginx -t`.
 - **HTTPS con Caddy**: la CA local está en

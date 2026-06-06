@@ -97,31 +97,10 @@ else
     PROXY_NAME="nginx"; SCHEME="http"
 fi
 
-# --- 7) Servicio systemd: opencode web autoarranca con la distro ---
-echo "==> Creando servicio systemd 'opencode-web'"
-sudo tee /etc/systemd/system/opencode-web.service >/dev/null <<EOF
-[Unit]
-Description=OpenCode web server (opencode-dotfiles)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=${USER_NAME}
-WorkingDirectory=${WORKDIR}
-Environment=HOME=${USER_HOME}
-Environment=BROWSER=/bin/true
-Environment=OPENCODE_PORT=${OPENCODE_PORT}
-Environment=OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
-ExecStart=${DIR}/opencode-web.sh
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# --- 8) Servicio systemd: opencode serve (API) para la APP DE ESCRITORIO ---
+# --- 7) Servicio systemd: opencode serve (API) para la APP DE ESCRITORIO ---
+# NOTA: 'opencode web' NO se ejecuta como servicio permanente. La web se usa
+# bajo demanda (ver README): vas a la carpeta del proyecto y ejecutas
+# 'opencode web', con lo que tambien puedes abrir cualquier directorio.
 echo "==> Creando servicio systemd 'opencode-serve' (API para la app de escritorio)"
 sudo tee /etc/systemd/system/opencode-serve.service >/dev/null <<EOF
 [Unit]
@@ -145,19 +124,19 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now opencode-web.service
 sudo systemctl enable --now opencode-serve.service
 sleep 2
-sudo systemctl restart opencode-web.service
 sudo systemctl restart opencode-serve.service
 
 echo ""
 echo "============================================================"
 echo " Provision completado."
-echo "   Proxy:        ${PROXY_NAME}  ->  ${SCHEME}://${OPENCODE_DOMAIN}"
-echo "   Web UI:       127.0.0.1:${OPENCODE_PORT}  (navegador, via proxy)"
-echo "   API (serve):  127.0.0.1:${OPENCODE_SERVE_PORT}  (app de escritorio / SDK)"
-echo "   Servicios:    systemctl status opencode-web opencode-serve ${PROXY_NAME}"
+echo "   API (serve):   127.0.0.1:${OPENCODE_SERVE_PORT}  (servicio PERMANENTE, app de escritorio / SDK)"
+echo "   Web (bajo demanda): ve a la carpeta del proyecto y ejecuta:"
+echo "                       opencode web --port ${OPENCODE_PORT}"
+echo "                  (asi opencode.local lo sirve; o usa el puerto que abra opencode)"
+echo "   Proxy listo:   ${SCHEME}://${OPENCODE_DOMAIN}  (responde cuando la web corre en ${OPENCODE_PORT})"
+echo "   Servicio:      systemctl status opencode-serve ${PROXY_NAME}"
 if [ "$SCHEME" = "https" ]; then
     echo ""
     echo " NOTA Caddy/HTTPS: para que el navegador de Windows confie en el"
