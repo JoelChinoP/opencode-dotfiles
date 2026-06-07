@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # provision.sh - instala y configura OpenCode en Arch Linux (nativo).
-# Instala opencode (repo oficial o AUR), aplica la config de git, instala las
-# dependencias del portapapeles grafico, levanta el reverse proxy elegido
-# (nginx o Caddy) y crea los servicios systemd (web + serve) que arrancan solos.
+# Instala opencode (repo oficial o AUR), instala las dependencias del
+# portapapeles grafico, levanta el reverse proxy elegido (nginx o Caddy)
+# apuntando al API del servicio systemd 'opencode-serve' (puerto 4096), que
+# tambien sirve la web UI en /app. Asi un solo proceso atiende TUI, web, app
+# de escritorio y SDK.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +14,7 @@ REPO="$(cd "$DIR/.." && pwd)"
 DEST="$HOME/.config/opencode-dotfiles"
 mkdir -p "$DEST"
 cp -f "$REPO/config/dotfiles.env" "$DEST/"
-cp -f "$DIR/opencode-web.sh" "$DIR/opencode-serve.sh" "$DEST/"
+cp -f "$DIR/opencode-serve.sh" "$DEST/"
 cp -f "$DIR/nginx-opencode.conf" "$DIR/Caddyfile" "$DEST/"
 # Por si el repo se clono en Windows: normaliza finales de linea.
 find "$DEST" -type f -exec sed -i 's/\r$//' {} +
@@ -21,7 +23,6 @@ chmod +x "$DEST/"*.sh
 # shellcheck disable=SC1090
 source "$DEST/dotfiles.env"
 : "${OPENCODE_WORKDIR:=code}"
-: "${OPENCODE_PORT:=47917}"
 : "${OPENCODE_SERVE_PORT:=4096}"
 : "${OPENCODE_DOMAIN:=opencode.local}"
 : "${OPENCODE_SERVER_PASSWORD:=}"
@@ -29,7 +30,7 @@ source "$DEST/dotfiles.env"
 USER_NAME="$(id -un)"
 USER_HOME="$HOME"
 WORKDIR="$USER_HOME/$OPENCODE_WORKDIR"
-echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  Web=$OPENCODE_PORT  API=$OPENCODE_SERVE_PORT  Dominio=$OPENCODE_DOMAIN"
+echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  API=$OPENCODE_SERVE_PORT  Dominio=$OPENCODE_DOMAIN"
 
 # --- 1) OpenCode (comando recomendado) ---
 if ! command -v opencode >/dev/null 2>&1; then
@@ -61,7 +62,7 @@ if ! grep -q -- "$OPENCODE_DOMAIN" /etc/hosts; then
     echo "==> /etc/hosts: anadido 127.0.0.1 $OPENCODE_DOMAIN"
 fi
 
-render() { sed -e "s|__PORT__|${OPENCODE_PORT}|g" -e "s|__DOMAIN__|${OPENCODE_DOMAIN}|g" "$1"; }
+render() { sed -e "s|__PORT__|${OPENCODE_SERVE_PORT}|g" -e "s|__DOMAIN__|${OPENCODE_DOMAIN}|g" "$1"; }
 
 # --- 5) Reverse proxy: lo decide el usuario (nginx http / Caddy https), no ambos ---
 echo ""
@@ -97,11 +98,11 @@ else
     PROXY_NAME="nginx"; SCHEME="http"
 fi
 
-# --- 6) Servicio systemd: opencode serve (API) para la APP DE ESCRITORIO ---
-# NOTA: 'opencode web' NO se ejecuta como servicio permanente. La web se usa
-# bajo demanda (ver README): vas a la carpeta del proyecto y ejecutas
-# 'opencode web', con lo que tambien puedes abrir cualquier directorio.
-echo "==> Creando servicio systemd 'opencode-serve' (API para la app de escritorio)"
+# --- 6) Servicio systemd: opencode serve (API + web UI en /app) ---
+# 'opencode serve' tambien sirve la web UI en la ruta /app, asi que este
+# unico proceso atiende al mismo tiempo: la app de escritorio, los SDK/IDE,
+# y el navegador via reverse proxy (opencode.local -> /app).
+echo "==> Creando servicio systemd 'opencode-serve' (API + web UI)"
 sudo tee /etc/systemd/system/opencode-serve.service >/dev/null <<EOF
 [Unit]
 Description=OpenCode API server (opencode-dotfiles)
@@ -131,13 +132,15 @@ sudo systemctl restart opencode-serve.service
 echo ""
 echo "============================================================"
 echo " Provision completado (Arch Linux)."
-echo "   API (serve):   127.0.0.1:${OPENCODE_SERVE_PORT}  (servicio PERMANENTE, app de escritorio / SDK)"
-echo "   Web (bajo demanda): ve a la carpeta del proyecto y ejecuta:"
-echo "                       opencode web --port ${OPENCODE_PORT}"
-echo "                  (asi opencode.local lo sirve; o usa el puerto que abra opencode)"
-echo "   TUI:           ejecuta  opencode  en la carpeta del proyecto"
-echo "   Proxy listo:   ${SCHEME}://${OPENCODE_DOMAIN}  (responde cuando la web corre en ${OPENCODE_PORT})"
-echo "   Servicio:      systemctl status opencode-serve ${PROXY_NAME}"
+echo "   Server permanente: 127.0.0.1:${OPENCODE_SERVE_PORT}  (API + web UI en /app)"
+echo "   Navegador:         ${SCHEME}://${OPENCODE_DOMAIN}    (proxy -> :${OPENCODE_SERVE_PORT}/app)"
+echo "                      o directo: http://localhost:${OPENCODE_SERVE_PORT}/app"
+echo "   TUI:               ejecuta  opencode  en la carpeta del proyecto"
+echo "   Workspace web:     ${WORKDIR}  (lo fija el WorkingDirectory del systemd)"
+echo "   Servicios:         systemctl status opencode-serve ${PROXY_NAME}"
+echo ""
+echo "   App de escritorio (opcional): bash $DIR/desktop.sh"
+echo "                  Instala opencode-desktop-bin (AUR) y la apunta al serve local."
 if [ "$SCHEME" = "https" ]; then
     echo ""
     echo " NOTA Caddy/HTTPS: la CA local de Caddy esta en"

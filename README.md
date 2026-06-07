@@ -95,9 +95,9 @@ opencode-dotfiles/
 │  └─ Caddyfile              # Plantilla de Caddy (https con TLS local)
 └─ arch/                     # Setup para Arch Linux nativo (ver su sección)
    ├─ install.sh             # Punto de entrada
-   ├─ provision.sh           # Instala opencode, proxy, deps GUI y servicios systemd
-   ├─ opencode-web.sh        # Lanzador de 'opencode web'
-   ├─ opencode-serve.sh      # Lanzador de 'opencode serve'
+   ├─ provision.sh           # Instala opencode, proxy, deps GUI y servicio systemd
+   ├─ opencode-serve.sh      # Lanzador de 'opencode serve' (API + web UI en /app)
+   ├─ desktop.sh             # Opcional: instala opencode-desktop-bin (AUR)
    ├─ nginx-opencode.conf    # Plantilla del sitio nginx (http)
    └─ Caddyfile              # Plantilla de Caddy (https con TLS local)
 ```
@@ -331,14 +331,17 @@ activo y el sistema de archivos es nativo (máximo rendimiento sin trucos).
 1. Instala **OpenCode** con el comando recomendado:
    - `paru -S opencode-bin` (o `yay`), AUR siempre al día, si tienes un *AUR helper*.
    - si no, `sudo pacman -S opencode` (repo oficial *extra*, estable).
-2. Aplica la config de git: `core.fileMode=false` y `core.autocrlf=input`.
-3. Instala las **dependencias gráficas** del portapapeles para el TUI:
+2. Instala las **dependencias gráficas** del portapapeles para el TUI:
    `wl-clipboard` (Wayland) o `xclip` (X11), según tu sesión.
-4. Levanta el servicio systemd permanente **`opencode-serve`** (API para la app
-   de escritorio). La web (`opencode web`) se usa **bajo demanda**, igual que en
-   Windows (ver [Usar la web y añadir proyectos](#usar-la-web-y-añadir-proyectos)).
-5. Instala **nginx** *o* **Caddy** con **`http(s)://opencode.local`** apuntando al
-   puerto de la web (lo eliges; nunca ambos), listo para cuando la lances.
+3. Levanta el servicio systemd permanente **`opencode-serve`** en `127.0.0.1:4096`.
+   Este único proceso expone a la vez el **API REST** (lo usan la app de escritorio,
+   los SDK y plugins IDE) y la **web UI** en la ruta `/app`. No hace falta
+   `opencode web` aparte.
+4. Instala **nginx** *o* **Caddy** con **`http(s)://opencode.local`** apuntando al
+   `:4096` del serve (lo eliges; nunca ambos). Abre `http://opencode.local/app`
+   en el navegador y ya está.
+5. Opcionalmente: `bash arch/desktop.sh` instala la app de escritorio nativa
+   (`opencode-desktop-bin` de AUR).
 
 ## Instalación
 
@@ -351,42 +354,60 @@ bash arch/install.sh
 Se te preguntará el reverse proxy (nginx por defecto, o Caddy para https).
 Ejecútalo como **tu usuario normal** (no root); pedirá `sudo` cuando haga falta.
 
-> Usa la misma `config/dotfiles.env` que Windows (puerto, dominio, etc.). En Arch
-> se ignora `WSL_DISTRO`.
+> Usa la misma `config/dotfiles.env` que Windows (puerto del serve, dominio, etc.).
+> En Arch se ignoran `WSL_DISTRO` y `OPENCODE_PORT` (solo aplican al setup WSL,
+> donde la web sí corre como proceso aparte).
 
-## Interfaz gráfica y "variables"
+## Por qué un solo `opencode serve` (y no `serve` + `web` por separado)
 
-- La **GUI principal** en Arch es la **web UI** (navegador), que lanzas **bajo
-  demanda** en la carpeta del proyecto con `opencode web` — idéntico a Windows.
-- Para el **TUI**, las "variables/dependencias gráficas" que necesitas son
-  `wl-clipboard`/`xclip` (los instala el provision). OpenCode los usa
-  automáticamente para pegar imágenes; **no necesitas exportar variables a mano**.
-- Como aquí todo es **local** (misma máquina), **no** hay que configurar ningún
-  host remoto: el TUI y la web trabajan en `~/code` directamente. La sección
-  `server` de `opencode.jsonc` (host/puerto) solo hace falta si conectas un
-  cliente/app a un `serve` remoto.
+A diferencia del setup WSL, en Arch nativo todo corre en la misma máquina, y el
+binario `opencode serve` ya **sirve también la web UI** en la ruta `/app` además
+del API. Un único proceso atiende los tres clientes:
+
+| Cliente | A dónde se conecta |
+|---|---|
+| Navegador (web UI) | `http://opencode.local/` → proxy → `127.0.0.1:4096/app` |
+| App de escritorio (`opencode-desktop`) | `http://127.0.0.1:4096` (API) |
+| TUI / SDK / plugins IDE | `http://127.0.0.1:4096` (API) |
+
+Es **menos memoria** (~300 MB vs ~600 MB con dos servers), **menos LSPs duplicados**
+y elimina el problema de sesiones desincronizadas entre web y app desktop.
+
+El trade-off: el `WorkingDirectory` del systemd está fijado a `~/code`, así que la
+web mostrará por defecto proyectos dentro de esa carpeta (puedes symlinkear los que
+estén en otro sitio). El TUI, en cambio, lo lanzas en cualquier carpeta y trabaja ahí.
 
 ## Uso diario (Arch)
 
 ```bash
 opencode                              # TUI, ejecútalo en la carpeta del proyecto
-opencode web --port 47917            # web bajo demanda -> http(s)://opencode.local
-systemctl status opencode-serve       # API permanente (app de escritorio)
-journalctl -u opencode-serve -e       # logs del API
-opencode auth login                   # proveedor de IA
+opencode auth login                   # configurar proveedor de IA (paso obligatorio)
+systemctl status opencode-serve       # ver estado del server
+journalctl -u opencode-serve -e       # logs del server
 opencode upgrade                      # actualizar (o: paru -S opencode-bin)
 ```
 
-Para la **web** abre el navegador en `http://opencode.local` (o `https://` con
-Caddy) **mientras** `opencode web` esté corriendo en el puerto del dominio.
+**Web:** abre el navegador en `http://opencode.local/app` (o `https://...` con
+Caddy). Si prefieres directo sin proxy: `http://localhost:4096/app`.
+
+**App de escritorio:** tras instalarla con `bash arch/desktop.sh`, abre la app y
+en `Configuración → Servidores → + Añadir servidor` pon `http://127.0.0.1:4096`
+y selecciónalo (la app NO lee `opencode.jsonc` para esto; el `+` de la UI es la
+única vía oficial).
 
 ## Solución de problemas (Arch)
 
-- **`opencode.local` no carga**: recuerda que la web es **bajo demanda** — debe
-  estar corriendo `opencode web --port 47917`. Revisa el proxy con
-  `systemctl status nginx` (o `caddy`) y `127.0.0.1 opencode.local` en `/etc/hosts`.
+- **`opencode.local` no carga**: el server permanente debe estar arriba —
+  `systemctl status opencode-serve` (debe decir `active (running)` y escuchar en
+  `:4096`). Verifica también el proxy con `systemctl status nginx` (o `caddy`) y
+  la línea `127.0.0.1 opencode.local` en `/etc/hosts`. Recuerda añadir `/app` a
+  la URL: `http://opencode.local/app`.
 - **nginx no toma el sitio**: en Arch, `nginx.conf` no incluye `conf.d` por
   defecto; el provision añade ese `include` (con backup). Verifica `nginx -t`.
+- **App de escritorio sigue mostrando `vlocal` (puerto random)**: la app no usa
+  `opencode.jsonc`. Añade el server desde su propia UI (`+ Añadir servidor` →
+  `http://127.0.0.1:4096`) y ciérrala con su menú (no con `kill -9`) para que
+  persista la elección.
 - **HTTPS con Caddy**: la CA local está en
   `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`. Impórtala
   en tu navegador para evitar el aviso de certificado.
