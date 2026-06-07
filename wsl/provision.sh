@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # provision.sh - se ejecuta DENTRO de Debian (WSL).
 # Instala paquetes, OpenCode, aplica la config de git pedida, levanta el
-# reverse proxy elegido (nginx o Caddy) y crea el servicio systemd que arranca
-# `opencode web` automaticamente con la distro.
+# reverse proxy elegido (nginx o Caddy) apuntando al API de 'opencode-serve'
+# (:4096), que TAMBIEN sirve la web UI en /app. Asi un solo proceso atiende
+# al navegador (via proxy), a la app de escritorio (via mirrored networking)
+# y a los SDK/plugins IDE.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +12,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/dotfiles.env"
 
 : "${OPENCODE_WORKDIR:=code}"
-: "${OPENCODE_PORT:=47917}"
 : "${OPENCODE_SERVE_PORT:=4096}"
 : "${OPENCODE_DOMAIN:=opencode.local}"
 : "${OPENCODE_SERVER_PASSWORD:=}"
@@ -19,7 +20,7 @@ USER_NAME="$(id -un)"
 USER_HOME="$HOME"
 WORKDIR="$USER_HOME/$OPENCODE_WORKDIR"
 
-echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  Puerto=$OPENCODE_PORT  Dominio=$OPENCODE_DOMAIN"
+echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  API=$OPENCODE_SERVE_PORT  Dominio=$OPENCODE_DOMAIN"
 
 # --- Aviso si systemd no esta activo (deberia estarlo tras 01-setup-wsl.ps1) ---
 if [ "$(ps -p 1 -o comm= 2>/dev/null)" != "systemd" ]; then
@@ -59,8 +60,9 @@ if ! grep -q -- "$OPENCODE_DOMAIN" /etc/hosts; then
     echo "==> /etc/hosts: anadido 127.0.0.1 $OPENCODE_DOMAIN"
 fi
 
-# Sustituye los marcadores __PORT__ / __DOMAIN__ de las plantillas.
-render() { sed -e "s|__PORT__|${OPENCODE_PORT}|g" -e "s|__DOMAIN__|${OPENCODE_DOMAIN}|g" "$1"; }
+# Sustituye los marcadores __PORT__ / __DOMAIN__ de las plantillas. El proxy
+# apunta al puerto del API (opencode-serve), que tambien sirve la web en /app.
+render() { sed -e "s|__PORT__|${OPENCODE_SERVE_PORT}|g" -e "s|__DOMAIN__|${OPENCODE_DOMAIN}|g" "$1"; }
 
 # --- 6) Reverse proxy: lo decide el usuario (nginx http / Caddy https), no ambos ---
 echo ""
@@ -97,11 +99,11 @@ else
     PROXY_NAME="nginx"; SCHEME="http"
 fi
 
-# --- 7) Servicio systemd: opencode serve (API) para la APP DE ESCRITORIO ---
-# NOTA: 'opencode web' NO se ejecuta como servicio permanente. La web se usa
-# bajo demanda (ver README): vas a la carpeta del proyecto y ejecutas
-# 'opencode web', con lo que tambien puedes abrir cualquier directorio.
-echo "==> Creando servicio systemd 'opencode-serve' (API para la app de escritorio)"
+# --- 7) Servicio systemd: opencode serve (API + web UI en /app) ---
+# Un unico proceso atiende: navegador (via proxy + /app), app de escritorio
+# (via mirrored networking) y SDK/plugins IDE. No hace falta levantar
+# 'opencode web' aparte. WorkingDirectory esta fijado a ${WORKDIR}.
+echo "==> Creando servicio systemd 'opencode-serve' (API + web UI)"
 sudo tee /etc/systemd/system/opencode-serve.service >/dev/null <<EOF
 [Unit]
 Description=OpenCode API server (opencode-dotfiles)
@@ -131,12 +133,12 @@ sudo systemctl restart opencode-serve.service
 echo ""
 echo "============================================================"
 echo " Provision completado."
-echo "   API (serve):   127.0.0.1:${OPENCODE_SERVE_PORT}  (servicio PERMANENTE, app de escritorio / SDK)"
-echo "   Web (bajo demanda): ve a la carpeta del proyecto y ejecuta:"
-echo "                       opencode web --port ${OPENCODE_PORT}"
-echo "                  (asi opencode.local lo sirve; o usa el puerto que abra opencode)"
-echo "   Proxy listo:   ${SCHEME}://${OPENCODE_DOMAIN}  (responde cuando la web corre en ${OPENCODE_PORT})"
-echo "   Servicio:      systemctl status opencode-serve ${PROXY_NAME}"
+echo "   Server permanente: 127.0.0.1:${OPENCODE_SERVE_PORT}  (API + web UI en /app)"
+echo "   Navegador (Win):   ${SCHEME}://${OPENCODE_DOMAIN}/app    (proxy -> :${OPENCODE_SERVE_PORT})"
+echo "                      o directo: http://localhost:${OPENCODE_SERVE_PORT}/app  (via mirrored)"
+echo "   App de escritorio: apuntala a  http://localhost:${OPENCODE_SERVE_PORT}"
+echo "   Workspace:         ${WORKDIR}  (lo fija el WorkingDirectory del systemd)"
+echo "   Servicios:         systemctl status opencode-serve ${PROXY_NAME}"
 if [ "$SCHEME" = "https" ]; then
     echo ""
     echo " NOTA Caddy/HTTPS: para que el navegador de Windows confie en el"

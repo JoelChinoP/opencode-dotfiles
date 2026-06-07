@@ -2,10 +2,11 @@
 
 Instalación y configuración automatizada de **OpenCode** en **Windows**
 (vía **WSL2 + Debian**) y en **Arch Linux** (nativo), optimizada para máxima
-compatibilidad y mínima pérdida de rendimiento. Publica `opencode web` tras un
-dominio local (`http://opencode.local`) vía **nginx** o **Caddy**, expone el API
-(`opencode serve`) para la **app de escritorio**, y deja todo como servicios
-**systemd** que arrancan solos.
+compatibilidad y mínima pérdida de rendimiento. Un **único** `opencode serve`
+expone simultáneamente el **API** (para la app de escritorio y los SDK) y la
+**web UI** en `/app`, publicado tras un dominio local
+(`http://opencode.local`) vía **nginx** o **Caddy**, y arranca solo como
+servicio **systemd**.
 
 > Basado en la documentación oficial de OpenCode (recomienda WSL en Windows por
 > "better file system performance, full terminal support, and compatibility")
@@ -26,12 +27,12 @@ dominio local (`http://opencode.local`) vía **nginx** o **Caddy**, expone el AP
 4. Aplica la configuración de git pedida:
    `core.fileMode=false` y `core.autocrlf=input`.
 5. Levanta **un** servicio systemd permanente que arranca solo con la distro:
-   - **`opencode serve`** → el **API** al que se conecta la **app de escritorio**.
-   - La **interfaz web** (`opencode web`) **no** corre como servicio: se usa
-     **bajo demanda** (ver [Usar la web y añadir proyectos](#usar-la-web-y-añadir-proyectos)).
+   **`opencode serve`** en `127.0.0.1:4096` → expone a la vez el **API REST**
+   (lo usan la app de escritorio y los SDK) y la **web UI** en la ruta `/app`.
+   No hace falta lanzar `opencode web` aparte.
 6. Instala **nginx** *o* **Caddy** (lo eliges; nunca ambos) con el dominio
-   **`http(s)://opencode.local`** apuntando al puerto de la web, listo para cuando
-   la lances bajo demanda en ese puerto.
+   **`http(s)://opencode.local`** apuntando al `:4096` del serve. Abres
+   `http://opencode.local/app` en el navegador de Windows y ya está.
 7. (Opcional) Instala la **app de escritorio** de OpenCode (Scoop) y la apunta al
    `opencode serve` de WSL.
 8. Crea atajos **`opencode`** y **`oc`** en el PATH de Windows: corren dentro de
@@ -89,8 +90,7 @@ opencode-dotfiles/
 │  └─ 04-desktop.ps1         # App de escritorio (Scoop) -> conecta a opencode serve
 ├─ wsl/
 │  ├─ provision.sh           # Provisión dentro de Debian (paquetes, opencode, proxy, systemd)
-│  ├─ opencode-web.sh        # Lanzador de 'opencode web' (uso bajo demanda)
-│  ├─ opencode-serve.sh      # Lanzador de 'opencode serve' API (servicio systemd)
+│  ├─ opencode-serve.sh      # Lanzador de 'opencode serve' (API + web UI en /app)
 │  ├─ nginx-opencode.conf    # Plantilla del sitio nginx (http)
 │  └─ Caddyfile              # Plantilla de Caddy (https con TLS local)
 └─ arch/                     # Setup para Arch Linux nativo (ver su sección)
@@ -112,10 +112,10 @@ Todo lo ajustable vive aquí. Cámbialo **antes** de instalar:
 |---|---|---|
 | `WSL_DISTRO` | `Debian` | Distribución WSL a usar/instalar. |
 | `OPENCODE_WORKDIR` | `code` | Carpeta de trabajo del servidor, en `~/code` (ext4 nativo, rápido). |
-| `OPENCODE_PORT` | `47917` | Puerto interno (poco usado) de `opencode web`, solo en `127.0.0.1`. |
-| `OPENCODE_SERVE_PORT` | `4096` | Puerto del API `opencode serve` para la **app de escritorio**/SDK. |
+| `OPENCODE_SERVE_PORT` | `4096` | Puerto del `opencode serve` (API + web UI en `/app`). El reverse proxy apunta aquí. |
 | `OPENCODE_DOMAIN` | `opencode.local` | Dominio local para el navegador. |
 | `OPENCODE_SERVER_PASSWORD` | *(vacío)* | Basic Auth opcional (usuario `opencode`). Recomendado si expones el puerto. |
+| `OPENCODE_PORT` | `47917` | *(legacy)* Puerto antiguo de `opencode web` por separado. Ya no lo usan ni Arch ni Windows; se mantiene para compatibilidad con setups personalizados. |
 
 ---
 
@@ -161,9 +161,10 @@ factor de rendimiento más importante es **dónde vive el proyecto**:
 - Por eso el servidor opera en **`~/code`** (filesystem **ext4 nativo** de
   Debian): máximo rendimiento.
 
-Además, `opencode web` escucha solo en `127.0.0.1:OPENCODE_PORT`; el dominio
-público lo expone el reverse proxy. Con `networkingMode=mirrored`, el navegador
-de Windows llega a `opencode.local` sin configuración extra de red.
+Además, el `opencode serve` escucha solo en `127.0.0.1:4096` dentro de WSL; el
+dominio público lo expone el reverse proxy. Con `networkingMode=mirrored`, el
+navegador de Windows llega a `opencode.local` (y a `localhost:4096`)
+directamente, sin configuración extra de red.
 
 ---
 
@@ -173,8 +174,8 @@ de Windows llega a `opencode.local` sin configuración extra de red.
   vuelves a Windows automáticamente.
 - `oc` → abre una shell de Debian (`exit` regresa a Windows).
 - `oc <comando>` → ejecuta un comando en Debian y vuelve. Ej.: `oc git status`.
-- **Web** → bajo demanda (ver abajo). El único servicio permanente es
-  `opencode serve` (para la app de escritorio).
+- **Web** → abre `http://opencode.local/app` en el navegador de Windows. La
+  sirve el mismo `opencode-serve` permanente; no hay que lanzar nada aparte.
 
 ### Comandos útiles dentro de WSL (`oc`)
 
@@ -188,40 +189,42 @@ oc opencode upgrade                   # actualizar OpenCode
 
 ---
 
-## Usar la web y añadir proyectos
+## Usar la web
 
-A diferencia de la app de escritorio (que tiene un explorador de carpetas nativo),
-**la web no puede "buscar y añadir" un directorio desde el navegador**: un navegador
-no puede abrir el explorador de archivos del sistema ni recorrer el filesystem del
-servidor. Por eso **`opencode web` se ancla al directorio donde lo ejecutas**.
+Abre **`http://opencode.local/app`** en el navegador de Windows. Caddy, en su
+caso: **`https://opencode.local/app`**. La sirve el mismo `opencode-serve` del
+systemd, no hay que lanzar nada aparte.
 
-Como consecuencia, **`opencode web` ya no corre como servicio permanente**. Para
-trabajar un proyecto en la web, lo **lanzas en su carpeta**:
-
-```powershell
-# Desde Windows, en la carpeta del proyecto que quieras abrir:
-#   - en el puerto fijo, para acceder por el dominio bonito:
-oc opencode web --port 47917         # luego abre  http(s)://opencode.local
-#   - o sin puerto fijo: opencode elige uno y abre el navegador directamente:
-oc opencode web
-```
-
-> El `47917` es tu `OPENCODE_PORT`. Solo cuando la web corre en ese puerto, el
-> proxy `opencode.local` la sirve; si usas `opencode web` a secas, accede por el
-> `localhost:<puerto>` que abra OpenCode.
-
-**Para "cambiar de proyecto" = ejecutar el comando en otra carpeta.** Dentro de
-WSL puedes ir a cualquier ruta y lanzarlo, por ejemplo:
+Como el server está fijado por `WorkingDirectory=` a **`~/code`** (dentro de
+Debian), la web mostrará los proyectos que tengas en esa carpeta. **Para
+añadir proyectos:**
 
 ```bash
-oc                                   # abre shell en Debian
-cd ~/code/otro-proyecto              # o:  cd /mnt/d/repos/mi-proyecto
-opencode web --port 47917            # sirve ESE proyecto en opencode.local
+oc                                       # entra a shell en Debian
+git clone <url> ~/code/<nombre>          # clona dentro de ~/code (ext4 nativo)
+# o, si el repo ya está en otro sitio fuera de ~/code:
+ln -s /mnt/d/repos/foo ~/code/foo        # symlink (sin coste de copia)
 ```
 
-Recuerda que el mejor rendimiento es con proyectos dentro de `~/code` (ext4 nativo).
-El **API** (`opencode serve`) sí queda siempre activo para la app de escritorio;
-ese también opera sobre `~/code` por defecto.
+> **Sobre rendimiento (importante):** un symlink a `/mnt/c` o `/mnt/d` **no
+> arregla** el cuello de botella — el server seguirá leyendo NTFS a través
+> del puente 9P (5–30× más lento, file watching no fiable). El máximo
+> rendimiento es con el repo realmente clonado en `~/code` (ext4 nativo).
+> Detalles cuantitativos en la sección [Por qué este diseño (rendimiento)](#por-qué-este-diseño-rendimiento).
+
+**Si necesitas que la web opere sobre OTRA carpeta** (caso raro, p. ej. un
+repo concreto en `/mnt/d`), detén el servicio temporalmente y arranca el server
+a mano en esa ruta:
+
+```bash
+oc
+sudo systemctl stop opencode-serve
+cd /mnt/d/repos/mi-proyecto
+opencode serve --port 4096        # mismo puerto → opencode.local y la app desktop le siguen pegando
+```
+
+Cuando termines, `sudo systemctl start opencode-serve` te devuelve al setup
+permanente sobre `~/code`.
 
 ---
 
@@ -235,26 +238,49 @@ servidor **`opencode serve`** que corre dentro de **WSL**. Lo hace el paso
 powershell -ExecutionPolicy Bypass -File .\windows\04-desktop.ps1
 ```
 
-**Cómo se le indica el servidor (importante).** Contrario a la creencia común,
-**no** se hace con una variable de entorno de "host". Los métodos oficiales son:
+**Cómo se le indica el servidor.** La app NO usa variables de entorno tipo
+"host" ni lee fielmente `opencode.jsonc` para esto (lo ignora con frecuencia
+y monta su propio server interno llamado `vlocal` en un puerto aleatorio).
+**La única vía 100% confiable es añadir el servidor desde la propia UI:**
 
-1. **Archivo `opencode.jsonc`** (lo que automatiza este repo). Se crea en
-   `%USERPROFILE%\.config\opencode\opencode.jsonc` con una sección `server`:
-   ```jsonc
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "server": { "hostname": "127.0.0.1", "port": 4096 }
-   }
-   ```
-   Con `networkingMode=mirrored`, `127.0.0.1:4096` de Windows = el `opencode serve`
-   de WSL.
-2. **Ajuste in-app**: en la pantalla *Home*, clic en el nombre del servidor (con
-   el punto de estado) → *Server picker* → fijas la URL `http://localhost:4096`.
+1. Abre la app.
+2. **Configuración → Servidores → `+ Añadir servidor`**.
+3. Pega una de estas URLs (cualquiera funciona; ver tabla más abajo):
+   - `http://localhost:4096` — **recomendado**, directo al serve.
+   - `http://opencode.local` — pasa por nginx (puerto 80 implícito).
+   - `https://opencode.local` — Caddy, requiere la CA importada (ver más abajo).
+4. **Click en la entrada** para activarla (el punto verde debe estar a su lado).
+5. **Cierra la app desde su menú** (Archivo → Salir, o Ctrl+Q). No con `kill -9`,
+   porque interrumpe el guardado en Electron y la selección no persiste.
+6. Reabre. Debe arrancar conectada al servidor correcto.
+
+**¿Cuál URL conviene?**
+
+| URL | Pasa por proxy | Depende de nginx/Caddy arriba | TLS |
+|---|---|---|---|
+| `http://localhost:4096` | No | No | No |
+| `http://opencode.local` | Sí | Sí | No |
+| `https://opencode.local` | Sí | Sí | Sí, con Caddy + CA importada al **trust store del sistema Windows** (la app Electron no usa el del navegador) |
+
+**Para uso normal**, `http://localhost:4096` es lo más robusto: cero dependencias
+extra y sigue funcionando aunque pares nginx.
 
 > ⚠️ La variable **`OPENCODE_PORT`** **no** sirve para apuntar a un host remoto:
 > si está definida en tu entorno de Windows, la app intentará levantar su **propio
 > servidor local** en ese puerto y fallará la conexión. `04-desktop.ps1` te avisa
 > si la detecta. Bórrala con `setx OPENCODE_PORT ""` si da problemas.
+
+**Cómo saber si está conectada al server correcto:**
+
+```bash
+oc ss -tlnp | grep opencode
+```
+
+Debe aparecer **solo un LISTEN en `:4096`**. Si ves un segundo puerto random
+(`:43xxx`, `:40xxx`…) ocupado por un proceso `opencode-desktop`, significa
+que la app sigue manteniendo su `vlocal` paralelamente. Vuelve a `+ Añadir
+servidor`, asegúrate de seleccionar la nueva entrada (punto verde) y elimina
+el `Local Server / vlocal` de la lista.
 
 Si la app muestra *"Connection Failed"* o se queda en el splash: arranca WSL una
 vez (`oc`) para que `opencode-serve` esté levantado, y revisa la URL del servidor.
@@ -291,10 +317,16 @@ Import-Certificate -FilePath $env:USERPROFILE\caddy-root.crt -CertStoreLocation 
 
 - **`opencode` no se reconoce**: abre una terminal nueva (el PATH se actualiza al
   reabrir).
-- **`opencode.local` no carga**: la web es **bajo demanda** — debe estar corriendo
-  `oc opencode web --port 47917`. Comprueba el proxy con `oc systemctl status nginx`
-  (o `caddy`) y la línea `127.0.0.1 opencode.local` en
-  `C:\Windows\System32\drivers\etc\hosts`.
+- **`opencode.local/app` no carga**: comprueba que el server permanente esté
+  arriba con `oc systemctl status opencode-serve` (debe decir `active (running)`
+  y escuchar en `:4096`). Verifica el proxy con `oc systemctl status nginx` (o
+  `caddy`) y la línea `127.0.0.1 opencode.local` en
+  `C:\Windows\System32\drivers\etc\hosts`. Recuerda añadir `/app` a la URL.
+- **App de escritorio sigue mostrando `vlocal` (puerto random)**: la app no
+  guarda nada al iniciar; tienes que añadir el server desde su propia UI
+  (`+ Añadir servidor` → `http://localhost:4096`) y cerrarla con su menú (no
+  con `kill`) para que persista la elección. Detalles en
+  [App de escritorio](#app-de-escritorio-windows).
 - **Puerto 80 ocupado en Windows**: descomenta `ignoredPorts=80,443` en
   `.wslconfig`, o cambia de proxy/puerto.
 - **Cambios en `.wslconfig` sin efecto**: `wsl --shutdown`, espera ~8 s y reabre.
@@ -355,8 +387,9 @@ Se te preguntará el reverse proxy (nginx por defecto, o Caddy para https).
 Ejecútalo como **tu usuario normal** (no root); pedirá `sudo` cuando haga falta.
 
 > Usa la misma `config/dotfiles.env` que Windows (puerto del serve, dominio, etc.).
-> En Arch se ignoran `WSL_DISTRO` y `OPENCODE_PORT` (solo aplican al setup WSL,
-> donde la web sí corre como proceso aparte).
+> Se ignoran `WSL_DISTRO` (no aplica en Arch nativo) y `OPENCODE_PORT` (es legacy
+> del flujo viejo con `opencode web` como proceso separado; tanto Arch como
+> Windows ahora unifican todo en `opencode serve`).
 
 ## Por qué un solo `opencode serve` (y no `serve` + `web` por separado)
 
@@ -390,10 +423,47 @@ opencode upgrade                      # actualizar (o: paru -S opencode-bin)
 **Web:** abre el navegador en `http://opencode.local/app` (o `https://...` con
 Caddy). Si prefieres directo sin proxy: `http://localhost:4096/app`.
 
-**App de escritorio:** tras instalarla con `bash arch/desktop.sh`, abre la app y
-en `Configuración → Servidores → + Añadir servidor` pon `http://127.0.0.1:4096`
-y selecciónalo (la app NO lee `opencode.jsonc` para esto; el `+` de la UI es la
-única vía oficial).
+### Configurar la app de escritorio (Arch)
+
+Después de instalarla con `bash arch/desktop.sh`, la app arranca con un servidor
+interno propio (`vlocal`, puerto aleatorio). Para que use tu `opencode-serve`
+permanente, **añádelo desde la propia UI** — es la única vía 100% confiable
+(la app no lee fiablemente `opencode.jsonc` para esto).
+
+1. Abre la app.
+2. **Configuración → Servidores → `+ Añadir servidor`**.
+3. Pega una de estas URLs (cualquiera funciona):
+   - `http://127.0.0.1:4096` — **recomendado**, directo al serve.
+   - `http://opencode.local` — pasa por nginx (puerto 80 implícito).
+   - `https://opencode.local` — Caddy. Requiere importar la CA al **trust store
+     del sistema** (no solo del navegador): `sudo trust anchor /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt && sudo update-ca-trust`.
+4. **Click en la nueva entrada** para activarla (punto verde a su lado).
+5. Elimina `vlocal` de la lista si quieres limpieza.
+6. **Cierra la app desde su menú** (Archivo → Salir, o Ctrl+Q), **no** con
+   `kill -9` — Electron interrumpe el guardado y la elección no persiste.
+7. Reabre. Debe arrancar conectada directamente.
+
+**Comparación de URLs para la app de escritorio:**
+
+| URL | Pasa por proxy | Depende de nginx/Caddy arriba | TLS |
+|---|---|---|---|
+| `http://127.0.0.1:4096` | No | No | No |
+| `http://opencode.local` | Sí | Sí | No |
+| `https://opencode.local` | Sí | Sí | Sí, con Caddy + CA en el trust store del sistema |
+
+Para uso normal, `http://127.0.0.1:4096` es lo más robusto. El dominio solo
+aporta si quieres TLS o una URL bonita; para la app, no añade nada real.
+
+**Verifica que está conectada al server correcto:**
+
+```bash
+ss -tlnp | grep opencode
+```
+
+Debe aparecer **solo un LISTEN en `:4096`**. Si ves un segundo puerto random
+(`:43xxx`, `:40xxx`…) propiedad de un proceso `opencode-desktop`, la app sigue
+manteniendo su `vlocal`. Repite los pasos asegurándote de seleccionar la nueva
+entrada y eliminar el `vlocal`.
 
 ## Solución de problemas (Arch)
 
