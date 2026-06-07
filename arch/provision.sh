@@ -44,12 +44,7 @@ if ! command -v opencode >/dev/null 2>&1; then
 fi
 echo "==> OpenCode: $(command -v opencode)  ($(opencode --version 2>/dev/null || echo '?'))"
 
-# --- 2) Configuracion de git pedida ---
-echo "==> git config global: core.fileMode=false  core.autocrlf=input"
-git config --global core.fileMode false
-git config --global core.autocrlf input
-
-# --- 3) Dependencias del portapapeles grafico (para pegar imagenes en el TUI) ---
+# --- 2) Dependencias del portapapeles grafico (para pegar imagenes en el TUI) ---
 echo "==> Dependencias graficas (clipboard)"
 case "${XDG_SESSION_TYPE:-}" in
     wayland) sudo pacman -S --needed --noconfirm wl-clipboard ;;
@@ -57,10 +52,10 @@ case "${XDG_SESSION_TYPE:-}" in
     *)       sudo pacman -S --needed --noconfirm wl-clipboard xclip ;;
 esac
 
-# --- 4) Carpeta de trabajo ---
+# --- 3) Carpeta de trabajo ---
 mkdir -p "$WORKDIR"
 
-# --- 5) /etc/hosts: dominio -> 127.0.0.1 ---
+# --- 4) /etc/hosts: dominio -> 127.0.0.1 ---
 if ! grep -q -- "$OPENCODE_DOMAIN" /etc/hosts; then
     echo "127.0.0.1 $OPENCODE_DOMAIN" | sudo tee -a /etc/hosts >/dev/null
     echo "==> /etc/hosts: anadido 127.0.0.1 $OPENCODE_DOMAIN"
@@ -68,7 +63,7 @@ fi
 
 render() { sed -e "s|__PORT__|${OPENCODE_PORT}|g" -e "s|__DOMAIN__|${OPENCODE_DOMAIN}|g" "$1"; }
 
-# --- 6) Reverse proxy: lo decide el usuario (nginx http / Caddy https), no ambos ---
+# --- 5) Reverse proxy: lo decide el usuario (nginx http / Caddy https), no ambos ---
 echo ""
 echo "Reverse proxy para ${OPENCODE_DOMAIN}:"
 echo "  [N] nginx -> http://${OPENCODE_DOMAIN}    (sin TLS, ligero, por defecto)"
@@ -102,7 +97,7 @@ else
     PROXY_NAME="nginx"; SCHEME="http"
 fi
 
-# --- 7) Servicio systemd: opencode serve (API) para la APP DE ESCRITORIO ---
+# --- 6) Servicio systemd: opencode serve (API) para la APP DE ESCRITORIO ---
 # NOTA: 'opencode web' NO se ejecuta como servicio permanente. La web se usa
 # bajo demanda (ver README): vas a la carpeta del proyecto y ejecutas
 # 'opencode web', con lo que tambien puedes abrir cualquier directorio.
