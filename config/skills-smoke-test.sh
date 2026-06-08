@@ -33,7 +33,7 @@ else
     NODE_PATH="$NODEDIR" node - <<'JS' 2>/dev/null && ok "requires docx/pptxgenjs/sdk" || miss "requires docx/pptxgenjs/sdk" "alguno no resuelve"
 require('docx');
 require('pptxgenjs');
-require('@modelcontextprotocol/sdk');
+require('@modelcontextprotocol/sdk/server/mcp.js');
 JS
 fi
 
@@ -106,7 +106,7 @@ systemctl is-active opencode-serve >/dev/null 2>&1 \
     && ok "opencode-serve activo" || miss "opencode-serve" "inactivo"
 curl -fsS http://127.0.0.1:4096/ -o /dev/null 2>/dev/null \
     && ok "API local responde" || miss "API local" "no responde en :4096"
-curl -fsS -o /dev/null --max-time 5 https://mcp.context7.com/mcp 2>/dev/null \
+curl -fsS -o /dev/null --max-time 5 https://mcp.context7.com/ping 2>/dev/null \
     && ok "context7 alcanzable" || miss "context7" "no responde (red?)"
 
 echo ""
