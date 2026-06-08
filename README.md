@@ -481,3 +481,204 @@ entrada y eliminar el `vlocal`.
 - **HTTPS con Caddy**: la CA local está en
   `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`. Impórtala
   en tu navegador para evitar el aviso de certificado.
+
+---
+---
+
+# Skills y configuración global (paso opcional, válido para Arch y WSL)
+
+Hasta aquí el setup base te deja `opencode serve` corriendo permanente con la
+web UI y la API. Este paso añade lo que hace falta para que el agente tenga,
+**de fábrica**, las capacidades que Claude trae en su chat: crear/editar Word,
+PDF, PPT y Excel; arte generativo; testing E2E; MCPs útiles (Context7,
+Playwright, GitHub opcional); búsqueda web; y un set de permisos balanceado.
+
+Funciona idéntico en **Arch nativo** y **WSL**.
+
+## Requisitos
+
+- **Node 20+** (recomendado 22+). El setup verifica al arrancar.
+- **Python 3.10+** (recomendado 3.12+). En Arch, el Python global está
+  *externally-managed* — por eso usamos venv aislado (no pisa nada).
+- **~3 GB libres** en disco:
+  - LibreOffice still: ~1 GB
+  - Chromium (Playwright): ~300 MB
+  - Skills + venvs + node_modules aislado: ~500 MB
+  - Resto de binarios (poppler, qpdf, tesseract, pandoc, ghostscript, imagemagick, ffmpeg): ~500 MB
+
+## Instalación
+
+**Arch nativo:**
+```bash
+cd /home/joel/git/opencode-dotfiles
+bash arch/skills.sh
+```
+
+**WSL:**
+```bash
+oc bash ~/opencode-dotfiles/wsl/skills.sh
+```
+
+El script es **idempotente**: puedes reejecutarlo cuando quieras (actualiza
+skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta).
+
+## Qué hace, paso a paso
+
+1. **Binarios del sistema** (pacman/apt): LibreOffice (still), poppler, qpdf,
+   tesseract, pandoc, ghostscript, imagemagick, ffmpeg, jq, rsync.
+2. **Clona los 17 skills** de `anthropics/skills` a `~/.config/opencode/skills/`:
+   - **Documentos:** `docx`, `pdf`, `pptx`, `xlsx`
+   - **Diseño/Arte:** `algorithmic-art`, `brand-guidelines`, `canvas-design`,
+     `theme-factory`, `slack-gif-creator`
+   - **Frontend:** `frontend-design`, `web-artifacts-builder`
+   - **Testing:** `webapp-testing` (Playwright Python)
+   - **Comunicación:** `internal-comms`, `doc-coauthoring`, `claude-api`
+   - **Meta:** `skill-creator`, `mcp-builder`
+3. **venv Python aislado** en `~/.venvs/opencode-skills` con: `python-docx`,
+   `openpyxl`, `pandas`, `pypdf`, `pdfplumber`, `reportlab`, `pytesseract`,
+   `pdf2image`, `markitdown[all]`, `Pillow`, `beautifulsoup4`, `markdown`,
+   `playwright`, `fastmcp`, `mcp`, `json5`.
+4. **Chromium para Playwright** (~300 MB) en `~/.cache/ms-playwright/`.
+5. **node_modules aislado** en `~/.opencode-skills/node/` con: `docx`,
+   `pptxgenjs`, `@modelcontextprotocol/sdk`.
+6. **Genera** `~/.config/opencode/opencode.jsonc` con MCP (Context7,
+   Playwright) y permisos balanceados. Si ya tenías config, **se mergea**
+   profundo y se hace backup (no se pisa nada de tu `server`/preferencias).
+7. **Genera** `~/.config/opencode/AGENTS.md` con reglas globales (usar
+   Context7 para docs, skills para Office, web search via Exa, idioma español).
+8. **Hook al shell**: añade una función `opencode()` a `~/.zshrc` (y
+   `~/.bashrc` si existe) que inyecta los paths aislados solo en esa
+   invocación. **No contamina tu shell normal**.
+9. **Reinicia `opencode-serve`** para que el systemd también cargue el venv
+   y los módulos Node aislados.
+10. **Smoke test** automático al final.
+
+## Aislamiento — por qué no rompe tus otros proyectos
+
+- **Python**: las libs viven en `~/.venvs/opencode-skills`, no en el Python
+  global ni en `~/.local`. Tus otros venvs/proyectos no las ven.
+- **Node**: las libs viven en `~/.opencode-skills/node`, no en `npm -g`.
+  `NODE_PATH` actúa como **fallback** (Node prefiere `./node_modules` local),
+  así que tus repos resuelven sus propias deps sin interferencia.
+- **Shell**: la función `opencode()` usa un subshell `( ... )` para exportar
+  las variables; al volver tu shell queda como antes. Si ejecutas `node` o
+  `python` por fuera de `opencode`, ves tu entorno normal.
+
+## Tokens opcionales (mejoran funcionalidades, no son obligatorios)
+
+Hay **un solo lugar recomendado** para meterlos: tu `~/.zshrc` (o `~/.bashrc`)
+o un archivo dedicado `~/.opencode-env` que sourceas desde el rc. La
+función `opencode()` que añade `skills.sh` los hereda automáticamente.
+
+```bash
+# === EXA (web search) ===
+# NO necesita API key. El flag OPENCODE_ENABLE_EXA=1 ya lo activa contra
+# el MCP hosted de Exa AI sin autenticación. skills.sh ya lo exporta en
+# ~/.config/opencode/skills-env.sh, no tienes que hacer nada más.
+
+# === Context7 (docs de librerías) ===
+# Funciona SIN key (rate-limit modesto). Si quieres más rate-limit, crea
+# cuenta gratis en https://context7.com → Dashboard → genera una API key
+# y exportala (también descomenta el bloque `headers` en opencode.jsonc):
+export CONTEXT7_API_KEY=...
+
+# === GitHub MCP ===
+# Solo si decides activar el MCP (ver siguiente sección). Genera un PAT en
+# https://github.com/settings/tokens (scopes mínimos: repo, read:org, gist).
+export GITHUB_TOKEN=ghp_...
+```
+
+## Activar el MCP de GitHub (opcional)
+
+El GitHub MCP **infla bastante el contexto** (muchas tools). Por eso queda
+**comentado** en el opencode.jsonc por defecto. Si lo quieres:
+
+1. Edita `~/.config/opencode/opencode.jsonc` y descomenta el bloque
+   `"github": {...}`.
+2. Exporta `GITHUB_TOKEN`.
+3. Para reducir el impacto, considera deshabilitarlo en sesiones normales y
+   activarlo solo en agentes específicos con `"tools": { "github_*": true }`
+   en ese agente.
+
+**Alternativa cero-overhead** (recomendada para la mayoría): déjalo comentado
+y deja que el agente use `gh` por bash (`gh pr view`, `gh issue list`,
+`gh search code`). El `AGENTS.md` global ya recomienda este enfoque.
+
+## Estructura de permisos balanceada
+
+El `opencode.jsonc` que se genera trae un bloque `permission` con esta
+filosofía: **el último patrón que coincide gana**, así que los denies van
+primero (irreversibles), el catch-all `"ask"` en medio, y los allows
+específicos al final.
+
+- **Denies duros** (siempre bloqueados): `sudo`, `rm -rf`, `mkfs`,
+  `dd if=/of=/dev/*`, `shutdown`, `reboot`, pipes `curl|sh`, `chmod -R 777`.
+- **Allows seguros**: lectura (`ls`, `cat`, `rg`, `grep`, `find`...), git no
+  destructivo, runtimes (`python`, `node`, `go run`, `cargo build`...),
+  scripts de proyecto (`npm run`, `npm test`, etc.), manipulación no
+  destructiva (`mkdir`, `cp`, `mv`, `touch`), toolchain de skills (`soffice`,
+  `pdftoppm`, `pandoc`, `convert`, `ffmpeg`...).
+- **`pip install` y `npm install` quedan en `ask`** intencionalmente — te
+  avisa antes de instalar paquetes (riesgo de typosquatting/malware). Cuando
+  OpenCode te pregunte, elige "Always" en esa sesión si confías.
+- **`.env`, claves SSH (`id_rsa`, `id_ed25519`), `*.pem`, `secrets/`**
+  bloqueados en `read`.
+
+Puedes editar `~/.config/opencode/opencode.jsonc` para ajustar a tu gusto;
+el script no lo vuelve a pisar mientras tenga la sentinela.
+
+## Verificación
+
+```bash
+bash config/skills-smoke-test.sh
+```
+
+Imprime OK/MISS por cada componente: imports Python, requires Node, binarios
+del sistema, presencia de los 17 skills, validez del `opencode.jsonc`, hook
+en el shell, `opencode-serve` activo y MCP de Context7 alcanzable.
+
+Exit code = número de fallos (0 si todo OK).
+
+## Desinstalación limpia
+
+```bash
+# 1. Quitar aislamientos
+rm -rf ~/.venvs/opencode-skills ~/.opencode-skills
+
+# 2. Quitar skills clonados (NO borra tu config ni tus sesiones)
+rm -rf ~/.config/opencode/skills
+
+# 3. (Opcional) Restaurar el opencode.jsonc previo — backups con timestamp:
+ls ~/.config/opencode/opencode.jsonc.bak-*
+# elige uno y: cp <bak> ~/.config/opencode/opencode.jsonc
+
+# 4. (Opcional) Quitar el hook del .zshrc / .bashrc:
+#    busca y elimina el bloque entre las sentinelas:
+#    # >>> opencode-dotfiles skills env >>>
+#    # <<< opencode-dotfiles skills env <<<
+
+# 5. Reejecutar provision base para reponer el opencode-serve.sh "limpio":
+bash arch/install.sh   # o el equivalente WSL
+```
+
+Los binarios del sistema (LibreOffice, etc.) los puedes dejar — no estorban.
+Si quieres quitarlos: `sudo pacman -Rs libreoffice-still poppler ...`.
+
+## Solución de problemas (skills)
+
+- **`bash arch/skills.sh` aborta por `python venv create`**: en Arch falta el
+  paquete `python` (deberías tenerlo); en Debian/WSL es `python3-venv`.
+- **`playwright install chromium` cuelga**: red lenta — son ~300 MB. Si la
+  ejecución se interrumpe, reejecuta `skills.sh` (es idempotente).
+- **`tesseract-data-eng` no existe en Arch**: el script lo detecta y sigue
+  sin él; tesseract base trae el OCR de inglés en muchos casos.
+- **Smoke test falla en `python imports`**: probablemente el `pip install`
+  no completó. Reejecuta `skills.sh` y mira la salida del Step 3.
+- **Smoke test falla en `node requires`**: ídem para Step 5. Verifica con
+  `ls ~/.opencode-skills/node/node_modules/`.
+- **El TUI nuevo no carga los skills**: cierra y abre una terminal nueva
+  (para cargar el hook del `.zshrc`). O simplemente `source ~/.zshrc`.
+- **El systemd `opencode-serve` no encuentra los skills**: confirma que
+  `~/.config/opencode/skills-env.sh` existe y que `opencode-serve.sh` en
+  `~/.config/opencode-dotfiles/` tiene el `source` (el `skills.sh` lo
+  re-copia automáticamente).

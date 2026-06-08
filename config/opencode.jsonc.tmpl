@@ -1,0 +1,143 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // ============================================================
+  //  MCP servers
+  //  Generado por opencode-dotfiles (skills.sh). Se mergea con tu
+  //  config existente respetando lo que ya tenias (ej. "server").
+  // ============================================================
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp"
+      // Opcional, mayor rate-limit con cuenta gratis (https://context7.com):
+      // "headers": { "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}" }
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@latest"]
+    }
+    // ---- GitHub MCP (opt-in) ----
+    // Descomenta el bloque siguiente y exporta GITHUB_TOKEN para activarlo.
+    // Atencion: este MCP infla bastante el contexto (muchas tools).
+    // Considera limitarlo per-agent con "tools": { "github_*": false }
+    // en agentes que no lo necesiten, o usar `gh` por bash como
+    // alternativa cero-overhead.
+    // ,
+    // "github": {
+    //   "type": "local",
+    //   "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+    //   "environment": {
+    //     "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_TOKEN}"
+    //   }
+    // }
+  },
+
+  // ============================================================
+  //  Permisos
+  //  Regla: dentro de cada herramienta (read, bash, ...), el ULTIMO
+  //  patron que coincide gana. Por eso los denies duros van primero
+  //  y luego se anaden los allows especificos al final.
+  // ============================================================
+  "permission": {
+    "edit": "allow",
+    "webfetch": "allow",
+    "agent": "ask",
+    "skill": { "*": "allow" },
+
+    "read": {
+      ".env": "deny",
+      ".env.*": "deny",
+      "**/.env": "deny",
+      "**/.env.*": "deny",
+      "**/id_rsa": "deny",
+      "**/id_ed25519": "deny",
+      "**/*.pem": "deny",
+      "**/secrets/**": "deny"
+    },
+
+    "bash": {
+      // --- Denies duros (irreversibles o peligrosos) ---
+      "sudo": "deny",
+      "sudo *": "deny",
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "rm -rf /*": "deny",
+      "mkfs*": "deny",
+      "dd if=*": "deny",
+      "dd of=/dev/*": "deny",
+      "shutdown*": "deny",
+      "reboot*": "deny",
+      "halt*": "deny",
+      "curl * | sh*": "deny",
+      "curl * | bash*": "deny",
+      "wget * | sh*": "deny",
+      "wget * | bash*": "deny",
+      "chmod -R 777 *": "deny",
+
+      // --- Default: preguntar ---
+      "*": "ask",
+
+      // --- Lectura / inspeccion (siempre seguro) ---
+      "ls": "allow", "ls *": "allow",
+      "cat *": "allow", "head *": "allow", "tail *": "allow",
+      "less *": "allow", "more *": "allow",
+      "rg *": "allow", "grep *": "allow", "fgrep *": "allow", "egrep *": "allow",
+      "find *": "allow", "fd *": "allow",
+      "pwd": "allow", "echo *": "allow", "printf *": "allow", "which *": "allow",
+      "file *": "allow", "stat *": "allow", "du *": "allow", "df *": "allow",
+      "wc *": "allow", "sort *": "allow", "uniq *": "allow",
+      "tr *": "allow", "cut *": "allow", "awk *": "allow", "sed -n *": "allow",
+      "diff *": "allow", "cmp *": "allow",
+
+      // --- Git no destructivo ---
+      "git status": "allow", "git status *": "allow",
+      "git diff": "allow", "git diff *": "allow",
+      "git log": "allow", "git log *": "allow",
+      "git show": "allow", "git show *": "allow",
+      "git branch": "allow", "git branch -*": "allow",
+      "git remote": "allow", "git remote *": "allow",
+      "git fetch": "allow", "git fetch *": "allow",
+      "git ls-files": "allow", "git ls-files *": "allow",
+      "git rev-parse *": "allow",
+      "git config --get *": "allow",
+      "git stash list": "allow", "git stash list *": "allow",
+      "git blame *": "allow",
+      "gh pr view *": "allow", "gh pr list *": "allow",
+      "gh issue view *": "allow", "gh issue list *": "allow",
+      "gh search *": "allow", "gh api *": "allow",
+
+      // --- Lenguajes / runtimes (ejecucion, NO install) ---
+      "python *": "allow", "python3 *": "allow",
+      "node *": "allow", "deno *": "allow", "bun *": "allow",
+      "go run *": "allow", "go test *": "allow", "go build *": "allow",
+      "cargo check*": "allow", "cargo build*": "allow", "cargo test*": "allow",
+      "make": "allow", "make *": "allow",
+
+      // --- Scripts de proyecto (sin install) ---
+      "npm run *": "allow", "npm test*": "allow", "npm start*": "allow",
+      "pnpm run *": "allow", "pnpm test*": "allow", "pnpm start*": "allow",
+      "yarn run *": "allow", "yarn test*": "allow", "yarn start*": "allow",
+      "bun run *": "allow", "bun test*": "allow",
+
+      // --- Manipulacion de archivos (no destructiva) ---
+      "mkdir *": "allow", "mkdir -p *": "allow",
+      "cp *": "allow", "cp -r *": "allow",
+      "mv *": "allow", "touch *": "allow", "ln -s*": "allow",
+
+      // NOTA: pip install / npm install se quedan en "ask" (catch-all).
+      // Asi te avisa antes de instalar paquetes nuevos (riesgo de
+      // typosquatting/malware). Cuando OpenCode te pregunta puedes
+      // elegir "Always" para esa sesion si confias.
+
+      // --- Toolchain de los skills (conversion/lectura) ---
+      "libreoffice *": "allow", "soffice *": "allow",
+      "pdftoppm *": "allow", "pdftotext *": "allow",
+      "qpdf *": "allow", "tesseract *": "allow",
+      "pandoc *": "allow", "gs *": "allow", "ghostscript *": "allow",
+      "convert *": "allow", "magick *": "allow",
+      "ffmpeg -i *": "allow", "ffmpeg -version": "allow",
+      "playwright *": "allow"
+    }
+  }
+}

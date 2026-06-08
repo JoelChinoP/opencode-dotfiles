@@ -1,0 +1,77 @@
+<!-- opencode-dotfiles -->
+# Reglas globales de OpenCode
+
+Estas reglas se aplican a TODAS tus sesiones de OpenCode. Cada proyecto
+puede anadir su propio `AGENTS.md` para sumar reglas especificas.
+
+## Documentacion de librerias y APIs
+
+- Para consultar docs de cualquier libreria, framework, SDK, CLI o cloud
+  service, usa las herramientas del MCP **`context7`** — incluso si crees
+  saber la respuesta. Tu corte de entrenamiento puede no reflejar cambios
+  recientes.
+- Para buscar codigo real en GitHub (ejemplos de uso, patrones), usa **`gh`**
+  por bash (`gh search code`, `gh search repos`). Es mas eficiente en tokens
+  que el MCP de GitHub.
+- NO invoques el MCP de GitHub salvo que se haya activado explicitamente y
+  el agente actual lo requiera.
+
+## Creacion y edicion de documentos
+
+Hay skills dedicados para los formatos comunes. **Cargalos ANTES** de
+escribir scripts a mano:
+
+- Word (.docx) → skill `docx`
+- PDF → skill `pdf`
+- PowerPoint (.pptx) → skill `pptx`
+- Excel (.xlsx, .csv, .tsv) → skill `xlsx`
+
+## Arte, diseno y temas
+
+- Arte generativo (p5.js, particle systems): skill `algorithmic-art`.
+- Diseno visual (posters, .png/.pdf artisticos): skill `canvas-design`.
+- Aplicar temas (colores/fuentes) a artifacts: skill `theme-factory`.
+- Colores y typography de Anthropic: skill `brand-guidelines`.
+- GIFs animados para Slack: skill `slack-gif-creator`.
+
+## Frontend y testing
+
+- Componentes / paginas / artifacts con React, Tailwind, shadcn/ui: skill
+  `frontend-design` (componentes simples) o `web-artifacts-builder`
+  (artifacts complejos multi-componente).
+- Testing E2E de webapps locales: skill `webapp-testing` (Playwright Python).
+
+## Meta-skills
+
+- Para crear nuevos skills o iterar sobre los existentes: skill `skill-creator`.
+- Para crear nuevos MCP servers (Python FastMCP o Node MCP SDK): skill
+  `mcp-builder`.
+
+## Comunicacion y docs colaborativos
+
+- Comunicaciones internas (status reports, FAQs, incident reports): skill
+  `internal-comms`.
+- Workflow guiado para co-autoria de documentacion: skill `doc-coauthoring`.
+
+## API de Claude y Anthropic SDK
+
+- Para construir, depurar o optimizar apps que usen la API de Claude /
+  Anthropic SDK: skill `claude-api`. Incluye prompt caching, tool use,
+  streaming, migracion entre modelos.
+
+## Busqueda web
+
+- `websearch` (Exa) esta habilitada. Usala cuando el tema sea posterior a
+  tu corte de entrenamiento o requiera datos recientes.
+- `webfetch` cuando ya tengas la URL exacta.
+
+## Verificacion de cambios
+
+- En vez de depender de LSP, ejecuta los comandos de lint/typecheck/test
+  del proyecto (suelen estar documentados en el `AGENTS.md` del repo) y
+  corrige segun la salida.
+
+## Idioma
+
+- Responde en espanol por defecto. Los identificadores de codigo y los
+  comentarios siguen las convenciones del proyecto (normalmente ingles).
