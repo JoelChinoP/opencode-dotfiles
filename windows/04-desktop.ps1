@@ -21,7 +21,12 @@ if (Test-Admin) {
 # --- Scoop (gestor de paquetes por usuario) ---
 if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
     Write-Step "Instalando Scoop (gestor de paquetes de usuario)"
-    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
+    # Scoop pide ExecutionPolicy RemoteSigned para CurrentUser. Pero si lanzaste
+    # con '-ExecutionPolicy Bypass', el scope Process (mas prioritario) invalida
+    # ese cambio y Set-ExecutionPolicy lanza un error de override. Como la policy
+    # efectiva ya permite ejecutar, el error es inocuo: lo tragamos y seguimos.
+    try { Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force -ErrorAction Stop }
+    catch { Write-Note "ExecutionPolicy no modificada (ya corres con una mas permisiva); se continua." }
     Invoke-RestMethod -Uri 'https://get.scoop.sh' | Invoke-Expression
 } else {
     Write-Ok "Scoop ya esta instalado"
