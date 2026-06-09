@@ -41,15 +41,18 @@ function Assert-Admin {
 
 function ConvertTo-WslPath {
     param([string]$WinPath, [string]$Distro)
-    # Convierte D:\a\b -> /mnt/d/a/b. Intenta usar wslpath dentro de la distro;
-    # si la distro aun no existe, hace la conversion a mano.
-    $p = ''
-    try { $p = (wsl -d $Distro wslpath -a "$WinPath") } catch { $p = '' }
-    if ([string]::IsNullOrWhiteSpace($p)) {
+    # Convierte D:\a\b -> /mnt/d/a/b SIN depender de wslpath: pasar la ruta con
+    # backslashes a wsl.exe es fragil (PowerShell 5.1 a veces se come la '\',
+    # produciendo "D:opencode-dotfiles"). La conversion manual es deterministica
+    # para rutas con letra de unidad, que es lo unico que maneja este repo.
+    if ($WinPath -match '^[A-Za-z]:\\') {
         $drive = $WinPath.Substring(0, 1).ToLower()
         $rest  = ($WinPath.Substring(2) -replace '\\', '/')
-        $p = "/mnt/$drive$rest"
+        return "/mnt/$drive$rest"
     }
+    # Rutas no estandar (UNC, etc.): intenta wslpath como ultimo recurso.
+    $p = ''
+    try { $p = (wsl -d $Distro wslpath -a "$WinPath") } catch { $p = '' }
     return $p.Trim()
 }
 

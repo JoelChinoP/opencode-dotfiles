@@ -31,6 +31,11 @@ chmod +x "`$DEST/"*.sh
 bash "`$DEST/provision.sh"
 "@
 
-wsl -d $distro -- bash -lc $bash
+# PowerShell 5.1 mangla los multilinea-con-comillas al pasarlos inline a wsl.exe
+# (se come las comillas y 'mkdir' queda sin argumento). Para evitarlo, el script
+# se pasa codificado en base64 y se decodifica dentro de WSL: el token base64 no
+# lleva comillas, espacios ni CR, asi que ningun quoting lo rompe.
+$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($bash -replace "`r`n", "`n")))
+wsl -d $distro -- bash -c "echo $b64 | base64 -d | bash"
 if ($LASTEXITCODE -ne 0) { throw "provision.sh fallo (codigo $LASTEXITCODE)" }
 Write-Ok "Paso 2 completado"
