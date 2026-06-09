@@ -18,7 +18,11 @@ source "$DIR/dotfiles.env"
 
 USER_NAME="$(id -un)"
 USER_HOME="$HOME"
-WORKDIR="$USER_HOME/$OPENCODE_WORKDIR"
+if [[ "$OPENCODE_WORKDIR" = /* ]]; then
+    WORKDIR="$OPENCODE_WORKDIR"
+else
+    WORKDIR="$USER_HOME/$OPENCODE_WORKDIR"
+fi
 
 echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  API=$OPENCODE_SERVE_PORT  Dominio=$OPENCODE_DOMAIN"
 
@@ -47,9 +51,10 @@ fi
 echo "==> OpenCode: $OPENCODE_BIN  ($("$OPENCODE_BIN" --version 2>/dev/null || echo '?'))"
 
 # --- 3) Configuracion de git pedida ---
-echo "==> git config global: core.fileMode=false  core.autocrlf=input"
+echo "==> git config global: core.autocrlf=input  core.eol=lf  core.fileMode=false"
 git config --global core.fileMode false
 git config --global core.autocrlf input
+git config --global core.eol lf
 
 # --- 4) Carpeta de trabajo (filesystem nativo, rapido) ---
 mkdir -p "$WORKDIR"
@@ -90,6 +95,7 @@ else
     echo "==> Instalando nginx (y desactivando Caddy si estaba)"
     sudo systemctl disable --now caddy 2>/dev/null || true
     sudo apt-get install -y nginx
+    sudo cp -f "$DIR/nginx-opencode-map.conf" /etc/nginx/conf.d/opencode-map.conf
     render "$DIR/nginx-opencode.conf" | sudo tee /etc/nginx/sites-available/opencode >/dev/null
     sudo ln -sf /etc/nginx/sites-available/opencode /etc/nginx/sites-enabled/opencode
     sudo rm -f /etc/nginx/sites-enabled/default
