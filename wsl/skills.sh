@@ -36,6 +36,31 @@ sudo apt-get install -y \
     jq \
     rsync
 
+# Instalador de runtimes que skills-common.sh (Step 0) invoca si faltan node,
+# python, etc. Traduce tokens abstractos a paquetes apt. Node va via NodeSource
+# para garantizar 20+ (el de los repos Debian suele ir por detras).
+platform_install_runtimes() {
+    local t pkgs=() want_node=0
+    for t in "$@"; do
+        case "$t" in
+            python) pkgs+=(python3 python3-venv python3-pip) ;;
+            node)   want_node=1 ;;
+            git)    pkgs+=(git) ;;
+            curl)   pkgs+=(curl ca-certificates) ;;
+            jq)     pkgs+=(jq) ;;
+        esac
+    done
+    sudo apt-get update -y
+    if [ "${#pkgs[@]}" -gt 0 ]; then
+        sudo apt-get install -y "${pkgs[@]}"
+    fi
+    if [ "$want_node" -eq 1 ]; then
+        echo "==> Instalando Node 22 LTS (NodeSource)"
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+    fi
+}
+
 # Cargar la logica compartida
 # shellcheck disable=SC1091
 source "$REPO_DIR/config/skills-common.sh"

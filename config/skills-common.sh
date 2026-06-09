@@ -31,6 +31,17 @@ die()    { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 have()   { command -v "$1" >/dev/null 2>&1; }
 require_var() { [ -n "${!1:-}" ] || die "Falta variable $1 (debe exportarla el wrapper de plataforma)"; }
 
+# Pregunta interactiva S/n (default S). Devuelve 0=si, 1=no. Respeta
+# SKILLS_ASSUME_YES=1 (para ejecuciones no atendidas) y, si no hay terminal,
+# cancela en vez de colgarse esperando una respuesta que nunca llegara.
+ask_yes_no() {
+    local prompt="$1" ans
+    if [ "${SKILLS_ASSUME_YES:-0}" = "1" ]; then return 0; fi
+    if [ ! -t 0 ]; then warn "sin terminal interactiva; no puedo preguntar: $prompt"; return 1; fi
+    read -r -p "$prompt [S/n]: " ans || return 1
+    [[ -z "$ans" || "$ans" =~ ^[SsYy] ]]
+}
+
 require_var REPO_DIR
 require_var PLATFORM
 
@@ -44,23 +55,51 @@ mkdir -p "$OPENCODE_CFG_DIR" "$SKILL_DIR" "$NODE_AISLADO" "$DEST"
 
 # --- Step 0: sanity de runtimes -------------------------------------------------
 log "Step 0 - chequeo de runtimes"
-have python3 || die "falta python3"
-have node    || die "falta node"
-have npm     || die "falta npm"
-have git     || die "falta git"
-have curl    || die "falta curl"
-have jq      || die "falta jq (deberia instalarlo el wrapper de plataforma antes)"
 
+# Runtimes minimos. Si falta alguno (o Node/Python no llegan al minimo) y el
+# wrapper de plataforma definio 'platform_install_runtimes', se OFRECE instalarlo
+# con el gestor de paquetes del sistema; si el usuario responde que no, se cancela
+# limpio. git/curl deberian venir de provision.sh; jq lo instala el Step 1.
+node_ok() {
+    have node || return 1
+    local maj; maj=$(node -p 'process.versions.node' 2>/dev/null | cut -d. -f1)
+    [ -n "$maj" ] && [ "$maj" -ge 20 ] 2>/dev/null
+}
+python_ok() {
+    have python3 || return 1
+    python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)' 2>/dev/null
+}
+
+missing=()
+python_ok || missing+=(python)
+node_ok   || missing+=(node)
+have npm  || [[ " ${missing[*]} " == *" node "* ]] || missing+=(node)  # npm viene con node
+have git  || missing+=(git)
+have curl || missing+=(curl)
+have jq   || missing+=(jq)
+
+if [ "${#missing[@]}" -gt 0 ]; then
+    warn "faltan o no cumplen el minimo: ${missing[*]}"
+    if declare -F platform_install_runtimes >/dev/null; then
+        if ask_yes_no "Instalarlos ahora con el gestor de paquetes del sistema?"; then
+            platform_install_runtimes "${missing[@]}"
+            hash -r   # refresca la cache de rutas del shell tras instalar
+        else
+            die "cancelado: instala manualmente [${missing[*]}] y reejecuta skills.sh"
+        fi
+    else
+        die "faltan [${missing[*]}] y no hay instalador de plataforma; instalalos y reejecuta"
+    fi
+fi
+
+# Garantia final (tras la posible instalacion): version exacta.
+have python3 || die "python3 sigue ausente tras el intento de instalacion"
 PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)'; then
-    die "se requiere Python 3.10+ (tienes $PYVER)"
-fi
-NODEVER=$(node -p 'process.versions.node')
-NODEMAJ=${NODEVER%%.*}
-if [ "$NODEMAJ" -lt 20 ]; then
-    die "se requiere Node 20+ (tienes $NODEVER)"
-fi
-echo "  Python $PYVER  /  Node $NODEVER  OK"
+python_ok || die "se requiere Python 3.10+ (tienes $PYVER)"
+node_ok   || die "se requiere Node 20+ (tienes $(node -v 2>/dev/null || echo ninguno))"
+have npm  || die "falta npm (deberia venir con node)"
+have jq   || die "falta jq"
+echo "  Python $PYVER  /  Node $(node -p 'process.versions.node')  OK"
 
 # --- Step 2: clonar skills (sparse-checkout) -----------------------------------
 # Step 1 (binarios) lo hizo ya el wrapper de plataforma.

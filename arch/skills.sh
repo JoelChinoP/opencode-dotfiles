@@ -47,6 +47,25 @@ else
     echo "   [info] tesseract-data-eng no esta en repos; tesseract base sera suficiente para OCR ingles"
 fi
 
+# Instalador de runtimes que skills-common.sh (Step 0) invoca si faltan node,
+# python, etc. Traduce tokens abstractos a paquetes de pacman. En Arch 'python'
+# ya incluye venv, y 'nodejs'+'npm' van por separado.
+platform_install_runtimes() {
+    local t pkgs=()
+    for t in "$@"; do
+        case "$t" in
+            python) pkgs+=(python python-pip) ;;
+            node)   pkgs+=(nodejs npm) ;;
+            git)    pkgs+=(git) ;;
+            curl)   pkgs+=(curl) ;;
+            jq)     pkgs+=(jq) ;;
+        esac
+    done
+    if [ "${#pkgs[@]}" -gt 0 ]; then
+        sudo pacman -S --needed --noconfirm "${pkgs[@]}"
+    fi
+}
+
 # Cargar la logica compartida
 # shellcheck disable=SC1091
 source "$REPO_DIR/config/skills-common.sh"
