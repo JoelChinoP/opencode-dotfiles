@@ -15,7 +15,10 @@
     },
     "playwright": {
       "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp@latest"]
+      // Instalado por skills.sh en el node_modules aislado (Step 5). Lanzarlo
+      // directo evita el cold-start de npx (resolver @latest contra el registry
+      // en cada sesion) y que un bump de @latest descargue otro Chromium.
+      "command": ["node", "{env:HOME}/.opencode-skills/node/node_modules/@playwright/mcp/cli.js"]
     }
     // ---- GitHub MCP (opt-in) ----
     // Descomenta el bloque siguiente y exporta GITHUB_TOKEN para activarlo.

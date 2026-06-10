@@ -11,8 +11,10 @@
 [wsl2]
 
 # RAM maxima para la VM de WSL2. Por defecto WSL toma el 50% del total del PC.
-# 4GB es conservador: si tu equipo tiene >=16GB y vas a usar Docker, sube a 6-8GB.
-memory=4GB
+# 8GB asume un equipo de >=16GB: opencode serve + Chromium (Playwright) +
+# LibreOffice + Docker no caben comodos en menos sin swapear (= latencias).
+# Si tu equipo tiene <16GB, baja a 4GB.
+memory=8GB
 
 # Nucleos logicos asignados a la VM. Por defecto = todos los de Windows.
 processors=4

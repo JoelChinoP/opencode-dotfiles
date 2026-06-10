@@ -172,8 +172,21 @@ log "Step 5 - node_modules aislado en $NODE_AISLADO"
 if [ ! -f "$NODE_AISLADO/package.json" ]; then
     (cd "$NODE_AISLADO" && npm init -y >/dev/null)
 fi
+# @playwright/mcp se instala aqui (y opencode.jsonc lo lanza con node directo)
+# en vez de 'npx -y @latest' por sesion: sin cold-start ni re-descargas cuando
+# @latest bumpea. Se actualiza cada vez que reejecutes skills.sh.
 (cd "$NODE_AISLADO" && npm install --silent --omit=dev --no-audit --no-fund \
-    docx pptxgenjs @modelcontextprotocol/sdk)
+    docx pptxgenjs @modelcontextprotocol/sdk @playwright/mcp@latest)
+
+# Chromium para la version de Playwright del MCP (no-op si ya esta en
+# ~/.cache/ms-playwright; comparte cache con el del venv si coinciden).
+PW_BIN="$NODE_AISLADO/node_modules/.bin/playwright"
+[ -x "$PW_BIN" ] || PW_BIN="$NODE_AISLADO/node_modules/.bin/playwright-core"
+if [ -x "$PW_BIN" ]; then
+    "$PW_BIN" install chromium
+else
+    warn "no encuentro el CLI de playwright en $NODE_AISLADO; el MCP descargara el browser al primer uso"
+fi
 
 # --- Step 6: generar skills-env.sh ---------------------------------------------
 log "Step 6 - generar $SKILLS_ENV_FILE"

@@ -15,7 +15,7 @@ DEST="$HOME/.config/opencode-dotfiles"
 mkdir -p "$DEST"
 cp -f "$REPO/config/dotfiles.env" "$DEST/"
 cp -f "$DIR/opencode-serve.sh" "$DEST/"
-cp -f "$DIR/nginx-opencode.conf" "$DIR/Caddyfile" "$DEST/"
+cp -f "$DIR/nginx-opencode.conf" "$DIR/nginx-opencode-map.conf" "$DIR/Caddyfile" "$DEST/"
 # Por si el repo se clono en Windows: normaliza finales de linea.
 find "$DEST" -type f -exec sed -i 's/\r$//' {} +
 chmod +x "$DEST/"*.sh
@@ -91,6 +91,7 @@ else
         sudo sed -i '0,/http[[:space:]]*{/s//http {\n    include \/etc\/nginx\/conf.d\/*.conf;/' /etc/nginx/nginx.conf
     fi
     sudo mkdir -p /etc/nginx/conf.d
+    sudo cp -f "$DEST/nginx-opencode-map.conf" /etc/nginx/conf.d/opencode-map.conf
     render "$DEST/nginx-opencode.conf" | sudo tee /etc/nginx/conf.d/opencode.conf >/dev/null
     sudo nginx -t
     sudo systemctl enable --now nginx
@@ -119,6 +120,9 @@ Environment=OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
 ExecStart=${DEST}/opencode-serve.sh
 Restart=on-failure
 RestartSec=3
+# Contiene leaks de memoria del server y sus hijos: por encima de este
+# umbral systemd hace reclaim suave (no mata el proceso, a diferencia de MemoryMax).
+MemoryHigh=4G
 
 [Install]
 WantedBy=multi-user.target

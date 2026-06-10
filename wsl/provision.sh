@@ -35,7 +35,7 @@ fi
 # --- 1) Paquetes base ---
 echo "==> Instalando paquetes base (nano, git, curl, ca-certificates, unzip)"
 sudo apt-get update -y
-sudo apt-get install -y nano git curl ca-certificates unzip
+sudo apt-get install -y --no-install-recommends nano git curl ca-certificates unzip
 
 # --- 2) OpenCode ---
 if ! command -v opencode >/dev/null 2>&1 && [ ! -x "$USER_HOME/.opencode/bin/opencode" ]; then
@@ -80,13 +80,13 @@ PROXY_CHOICE="${PROXY_CHOICE:-N}"
 if [[ "$PROXY_CHOICE" =~ ^[Cc] ]]; then
     echo "==> Instalando Caddy (y desactivando nginx si estaba)"
     sudo systemctl disable --now nginx 2>/dev/null || true
-    sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https gnupg
+    sudo apt-get install -y --no-install-recommends debian-keyring debian-archive-keyring apt-transport-https gnupg
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
         | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
         | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
     sudo apt-get update -y
-    sudo apt-get install -y caddy
+    sudo apt-get install -y --no-install-recommends caddy
     render "$DIR/Caddyfile" | sudo tee /etc/caddy/Caddyfile >/dev/null
     sudo systemctl enable --now caddy
     sudo systemctl restart caddy
@@ -94,7 +94,7 @@ if [[ "$PROXY_CHOICE" =~ ^[Cc] ]]; then
 else
     echo "==> Instalando nginx (y desactivando Caddy si estaba)"
     sudo systemctl disable --now caddy 2>/dev/null || true
-    sudo apt-get install -y nginx
+    sudo apt-get install -y --no-install-recommends nginx
     sudo cp -f "$DIR/nginx-opencode-map.conf" /etc/nginx/conf.d/opencode-map.conf
     render "$DIR/nginx-opencode.conf" | sudo tee /etc/nginx/sites-available/opencode >/dev/null
     sudo ln -sf /etc/nginx/sites-available/opencode /etc/nginx/sites-enabled/opencode
@@ -126,6 +126,9 @@ Environment=OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
 ExecStart=${DIR}/opencode-serve.sh
 Restart=on-failure
 RestartSec=3
+# Contiene leaks de memoria del server y sus hijos: por encima de este
+# umbral systemd hace reclaim suave (no mata el proceso, a diferencia de MemoryMax).
+MemoryHigh=4G
 
 [Install]
 WantedBy=multi-user.target

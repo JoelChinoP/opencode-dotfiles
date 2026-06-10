@@ -128,7 +128,7 @@ editarlo: `wsl --shutdown` y reabrir (la "regla de los ~8 s" de Microsoft).
 
 | Clave | Valor | Para qué sirve |
 |---|---|---|
-| `memory` | `4GB` | RAM máxima de la VM. Por defecto WSL toma el 50% del PC. Súbela a 6-8GB si tienes ≥16GB y usarás Docker. |
+| `memory` | `8GB` | RAM máxima de la VM. Por defecto WSL toma el 50% del PC. Asume un equipo de ≥16GB (opencode + Chromium + LibreOffice + Docker swapean con menos); bájala a 4GB si tienes menos RAM. |
 | `processors` | `4` | Núcleos lógicos para la VM. |
 | `nestedVirtualization` | `true` | Permite VMs/containers anidados (escenarios de Docker/K8s). |
 | `guiApplications` | `true` | WSLg: apps Linux con interfaz gráfica. |
@@ -524,8 +524,10 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
 
 ## Qué hace, paso a paso
 
-1. **Binarios del sistema** (pacman/apt): LibreOffice (still), poppler, qpdf,
-   tesseract, pandoc, ghostscript, imagemagick, ffmpeg, jq, rsync.
+1. **Binarios del sistema** (pacman/apt): LibreOffice (en Arch `libreoffice-still`;
+   en Debian/WSL solo writer/calc/impress con `--no-install-recommends`, que
+   ahorra >1 GB), poppler, qpdf, tesseract, pandoc, ghostscript, imagemagick,
+   ffmpeg, jq, rsync.
 2. **Clona los 17 skills** de `anthropics/skills` a `~/.config/opencode/skills/`:
    - **Documentos:** `docx`, `pdf`, `pptx`, `xlsx`
    - **Diseño/Arte:** `algorithmic-art`, `brand-guidelines`, `canvas-design`,
@@ -540,7 +542,9 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
    `playwright`, `fastmcp`, `mcp`, `json5`.
 4. **Chromium para Playwright** (~300 MB) en `~/.cache/ms-playwright/`.
 5. **node_modules aislado** en `~/.opencode-skills/node/` con: `docx`,
-   `pptxgenjs`, `@modelcontextprotocol/sdk`.
+   `pptxgenjs`, `@modelcontextprotocol/sdk`, `@playwright/mcp` (el MCP de
+   Playwright se lanza desde aquí, sin `npx` por sesión: arranque más rápido
+   y sin re-descargas de Chromium cuando `@latest` cambia).
 6. **Genera** `~/.config/opencode/opencode.jsonc` con MCP (Context7,
    Playwright) y permisos balanceados. Si ya tenías config, **se mergea**
    profundo y se hace backup (no se pisa nada de tu `server`/preferencias).

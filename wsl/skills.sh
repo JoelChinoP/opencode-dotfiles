@@ -23,8 +23,16 @@ fi
 
 echo "==> Step 1 - binarios del sistema (apt-get)"
 sudo apt-get update -y
-sudo apt-get install -y \
-    libreoffice \
+# --no-install-recommends + componentes sueltos de LibreOffice en vez del
+# metapaquete completo: ahorra >1 GB de disco y minutos de instalacion.
+# fonts-liberation/dejavu: fuentes minimas para que las conversiones a PDF
+# salgan bien (con no-recommends ya no entran solas).
+sudo apt-get install -y --no-install-recommends \
+    libreoffice-writer \
+    libreoffice-calc \
+    libreoffice-impress \
+    fonts-liberation \
+    fonts-dejavu-core \
     poppler-utils \
     qpdf \
     tesseract-ocr \
@@ -52,12 +60,12 @@ platform_install_runtimes() {
     done
     sudo apt-get update -y
     if [ "${#pkgs[@]}" -gt 0 ]; then
-        sudo apt-get install -y "${pkgs[@]}"
+        sudo apt-get install -y --no-install-recommends "${pkgs[@]}"
     fi
     if [ "$want_node" -eq 1 ]; then
         echo "==> Instalando Node 22 LTS (NodeSource)"
         curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-        sudo apt-get install -y nodejs
+        sudo apt-get install -y --no-install-recommends nodejs
     fi
 }
 
