@@ -111,7 +111,7 @@ Todo lo ajustable vive aquí. Cámbialo **antes** de instalar:
 | Clave | Por defecto | Qué es |
 |---|---|---|
 | `WSL_DISTRO` | `Debian` | Distribución WSL a usar/instalar. |
-| `OPENCODE_WORKDIR` | `code` | Carpeta de trabajo del servidor, en `~/code` (ext4 nativo, rápido). |
+| `OPENCODE_WORKDIR` | `/home/joel` | Carpeta de trabajo del servidor, en `~/code` (ext4 nativo, rápido). |
 | `OPENCODE_SERVE_PORT` | `4096` | Puerto del `opencode serve` (API + web UI en `/app`). El reverse proxy apunta aquí. |
 | `OPENCODE_DOMAIN` | `opencode.local` | Dominio local para el navegador. |
 | `OPENCODE_SERVER_PASSWORD` | *(vacío)* | Basic Auth opcional (usuario `opencode`). Recomendado si expones el puerto. |

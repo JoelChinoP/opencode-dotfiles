@@ -11,7 +11,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1090
 source "$DIR/dotfiles.env"
 
-: "${OPENCODE_WORKDIR:=code}"
+: "${OPENCODE_WORKDIR:=/home/joel}"
 : "${OPENCODE_SERVE_PORT:=4096}"
 : "${OPENCODE_DOMAIN:=opencode.local}"
 : "${OPENCODE_SERVER_PASSWORD:=}"

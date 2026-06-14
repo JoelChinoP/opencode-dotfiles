@@ -16,7 +16,7 @@ if [ -f "$HOME/.config/opencode/skills-env.sh" ]; then
     . "$HOME/.config/opencode/skills-env.sh"
 fi
 
-: "${OPENCODE_WORKDIR:=code}"
+: "${OPENCODE_WORKDIR:=/home/joel}"
 : "${OPENCODE_SERVE_PORT:=4096}"
 
 # systemd arranca con un PATH minimo; aseguramos el bin de opencode.

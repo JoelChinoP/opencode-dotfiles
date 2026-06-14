@@ -22,7 +22,7 @@ chmod +x "$DEST/"*.sh
 
 # shellcheck disable=SC1090
 source "$DEST/dotfiles.env"
-: "${OPENCODE_WORKDIR:=code}"
+: "${OPENCODE_WORKDIR:=/home/joel}"
 : "${OPENCODE_SERVE_PORT:=4096}"
 : "${OPENCODE_DOMAIN:=opencode.local}"
 : "${OPENCODE_SERVER_PASSWORD:=}"
