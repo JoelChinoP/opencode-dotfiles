@@ -29,7 +29,11 @@ source "$DEST/dotfiles.env"
 
 USER_NAME="$(id -un)"
 USER_HOME="$HOME"
-WORKDIR="$USER_HOME/$OPENCODE_WORKDIR"
+if [[ "$OPENCODE_WORKDIR" = /* ]]; then
+    WORKDIR="$OPENCODE_WORKDIR"
+else
+    WORKDIR="$USER_HOME/$OPENCODE_WORKDIR"
+fi
 echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  API=$OPENCODE_SERVE_PORT  Dominio=$OPENCODE_DOMAIN"
 
 # --- 1) OpenCode (comando recomendado) ---

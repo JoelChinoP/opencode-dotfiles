@@ -21,7 +21,13 @@ fi
 
 export PATH="$HOME/.opencode/bin:$HOME/.local/bin:/usr/bin:$PATH"
 
-cd "$HOME/$OPENCODE_WORKDIR"
+if [[ "$OPENCODE_WORKDIR" = /* ]]; then
+    WORKDIR="$OPENCODE_WORKDIR"
+else
+    WORKDIR="$HOME/$OPENCODE_WORKDIR"
+fi
+
+cd "$WORKDIR"
 
 export OPENCODE_SERVER_PASSWORD="${OPENCODE_SERVER_PASSWORD:-}"
 
