@@ -29,6 +29,8 @@ def deep_merge(a, b):
     for key, value in b.items():
         if isinstance(value, dict) and isinstance(a.get(key), dict):
             deep_merge(a[key], value)
+        elif key == "plugin" and isinstance(value, list) and isinstance(a.get(key), list):
+            a[key].extend(item for item in value if item not in a[key])
         else:
             a[key] = value
     return a
