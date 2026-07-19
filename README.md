@@ -1,266 +1,488 @@
 # opencode-dotfiles
 
 Instalación y configuración automatizada de **OpenCode** en **Windows**
-mediante **WSL2 + Debian** y en **Arch Linux** nativo.
+(vía **WSL2 + Debian**) y en **Arch Linux** (nativo), optimizada para máxima
+compatibilidad y mínima pérdida de rendimiento. Un **único** `opencode serve`
+expone simultáneamente el **API** (para la app de escritorio y los SDK) y la
+**web UI** en `/app`, publicado tras un dominio local
+(`http://opencode.local`) vía **nginx** o **Caddy**, y arranca solo como
+servicio **systemd**.
 
-El setup base ejecuta un único <code>opencode serve</code> como servicio
-<code>systemd</code>. Este proceso expone el API y la web UI en <code>/app</code>,
-ambos limitados a <code>127.0.0.1:4096</code>. El navegador, la app de escritorio
-y los SDK se conectan directamente a ese servicio.
+> Basado en la documentación oficial de OpenCode (recomienda WSL en Windows por
+> "better file system performance, full terminal support, and compatibility")
+> y en la documentación oficial de Microsoft para `.wslconfig`.
 
-- [Windows (WSL2 + Debian)](#windows-wsl2--debian)
-- [Arch Linux (nativo)](#arch-linux-nativo)
-- [Skills y configuración global](#skills-y-configuración-global-paso-opcional-válido-para-arch-y-wsl)
+- **Windows** → sección [Windows (WSL2 + Debian)](#windows-wsl2--debian).
+- **Arch Linux** → sección [Arch Linux (nativo)](#arch-linux-nativo).
 
 ---
 
 # Windows (WSL2 + Debian)
 
-## Qué hace
+## ¿Qué hace este setup?
 
-1. Instala o configura WSL2 y Debian.
-2. Copia una <code>.wslconfig</code> preparada para OpenCode y Docker.
-3. Habilita <code>systemd</code> dentro de Debian.
-4. Instala los paquetes base y OpenCode.
-5. Configura Git con <code>core.fileMode=false</code>,
-   <code>core.autocrlf=input</code> y <code>core.eol=lf</code>.
-6. Crea el servicio permanente <code>opencode-serve</code> en
-   <code>127.0.0.1:4096</code>.
-7. Crea los comandos <code>opencode</code> y <code>oc</code> para Windows.
-8. Opcionalmente instala la app de escritorio mediante Scoop.
+1. **Instala/configura WSL2** y la distro **Debian** (la deja como predeterminada).
+2. Aplica un **`.wslconfig`** optimizado para OpenCode + Docker.
+3. Dentro de Debian instala **nano, git, curl** y **OpenCode**.
+4. Aplica la configuración de git pedida:
+   `core.fileMode=false` y `core.autocrlf=input`.
+5. Levanta **un** servicio systemd permanente que arranca solo con la distro:
+   **`opencode serve`** en `127.0.0.1:4096` → expone a la vez el **API REST**
+   (lo usan la app de escritorio y los SDK) y la **web UI** en la ruta `/app`.
+   No hace falta lanzar `opencode web` aparte.
+6. Instala **nginx** *o* **Caddy** (lo eliges; nunca ambos) con el dominio
+   **`http(s)://opencode.local`** apuntando al `:4096` del serve. Abres
+   `http://opencode.local/app` en el navegador de Windows y ya está.
+7. (Opcional) Instala la **app de escritorio** de OpenCode (Scoop) y la apunta al
+   `opencode serve` de WSL.
+8. Crea atajos **`opencode`** y **`oc`** en el PATH de Windows: corren dentro de
+   Debian y vuelven a Windows al terminar (no escribes `wsl` cada vez).
 
-La web queda disponible en <code>http://localhost:4096/app</code>. La red
-mirrored de WSL permite que el <code>localhost</code> de Windows llegue
-directamente al servicio de Debian.
+Alcance: cubre desde cero hasta poder **lanzar OpenCode** (TUI, web y escritorio).
+No configura el proveedor de IA (eso se hace luego con `opencode auth login`).
 
-El proveedor de IA se configura después con <code>opencode auth login</code>.
+---
 
 ## Requisitos
 
-- Windows 11 22H2 o superior para <code>networkingMode=mirrored</code>.
-- Permisos de administrador para instalar y configurar WSL.
+- Windows 11 22H2 o superior (necesario para `networkingMode=mirrored`).
+- Permisos de administrador (para instalar WSL y editar el `hosts` de Windows).
 - Conexión a internet.
+
+---
 
 ## Instalación rápida
 
-Desde PowerShell:
+Desde una terminal **PowerShell** (se auto-eleva a administrador con UAC):
 
-~~~powershell
+```powershell
 git clone <url-de-este-repo> D:\opencode-dotfiles
 cd D:\opencode-dotfiles
 powershell -ExecutionPolicy Bypass -File .\windows\install.ps1
-~~~
+```
 
-El instalador se eleva con UAC solo para el paso que configura WSL. Si Debian ya
-existe, permite conservarla o reinstalarla. La app de escritorio se ofrece como
-paso opcional.
+Durante el proceso se te preguntará:
 
-Si Windows pide reiniciar durante la primera instalación de WSL, reinicia y
-vuelve a ejecutar <code>install.ps1</code>.
+- Si Debian ya existe: **usar la actual** (por defecto) o **reinstalar limpio**.
+- Qué reverse proxy quieres: **nginx (http)** por defecto o **Caddy (https)**.
 
-## Estructura principal
+Al terminar, abre una **terminal nueva** y ejecuta `opencode`, o entra a
+`http://opencode.local` en el navegador.
 
-~~~text
+> Si es la **primera vez** que se instala WSL en el equipo, Windows pedirá un
+> **reinicio**. Reinicia y vuelve a ejecutar `install.ps1`.
+
+---
+
+## Estructura del repositorio
+
+```
 opencode-dotfiles/
 ├─ config/
-│  └─ dotfiles.env
+│  └─ dotfiles.env            # Configuración central editable (compartida Win/Arch)
 ├─ windows/
-│  ├─ .wslconfig
-│  ├─ install.ps1
-│  ├─ 01-setup-wsl.ps1
-│  ├─ 02-provision.ps1
-│  ├─ 03-launchers.ps1
-│  └─ 04-desktop.ps1
+│  ├─ .wslconfig             # Plantilla -> %USERPROFILE%\.wslconfig (ajustes de la VM)
+│  ├─ common.ps1             # Utilidades compartidas
+│  ├─ install.ps1            # Orquestador (auto-eleva) -> 01..04
+│  ├─ 01-setup-wsl.ps1       # WSL2 + Debian + .wslconfig + systemd + hosts   [Admin]
+│  ├─ 02-provision.ps1       # Copia y ejecuta provision.sh dentro de Debian
+│  ├─ 03-launchers.ps1       # Atajos 'opencode' y 'oc' en el PATH de Windows
+│  └─ 04-desktop.ps1         # App de escritorio (Scoop) -> conecta a opencode serve
 ├─ wsl/
-│  ├─ provision.sh
-│  ├─ opencode-serve.sh
-│  └─ skills.sh
-└─ arch/
-   ├─ install.sh
-   ├─ provision.sh
-   ├─ opencode-serve.sh
-   ├─ desktop.sh
-   └─ skills.sh
-~~~
+│  ├─ provision.sh           # Provisión dentro de Debian (paquetes, opencode, proxy, systemd)
+│  ├─ opencode-serve.sh      # Lanzador de 'opencode serve' (API + web UI en /app)
+│  ├─ nginx-opencode.conf    # Plantilla del sitio nginx (http)
+│  └─ Caddyfile              # Plantilla de Caddy (https con TLS local)
+└─ arch/                     # Setup para Arch Linux nativo (ver su sección)
+   ├─ install.sh             # Punto de entrada
+   ├─ provision.sh           # Instala opencode, proxy, deps GUI y servicio systemd
+   ├─ opencode-serve.sh      # Lanzador de 'opencode serve' (API + web UI en /app)
+   ├─ desktop.sh             # Opcional: instala opencode-desktop-bin (AUR)
+   ├─ nginx-opencode.conf    # Plantilla del sitio nginx (http)
+   └─ Caddyfile              # Plantilla de Caddy (https con TLS local)
+```
 
-## Configuración central
+---
 
-Edita <code>config/dotfiles.env</code> antes de instalar:
+## Configuración central: `config/dotfiles.env`
 
-| Clave | Valor inicial | Uso |
-|---|---:|---|
-| <code>WSL_DISTRO</code> | <code>Debian</code> | Distribución WSL que se instala o reutiliza. |
-| <code>OPENCODE_WORKDIR</code> | <code>.config/opencode</code> | Directorio de trabajo del servicio; una ruta relativa parte de <code>$HOME</code>. |
-| <code>OPENCODE_SERVE_PORT</code> | <code>4096</code> | Puerto local del API y la web UI. |
-| <code>OPENCODE_SERVER_PASSWORD</code> | vacío | Basic Auth opcional; el usuario predeterminado es <code>opencode</code>. |
-| <code>SKILLS_REPO</code> | repositorio oficial | Origen de los skills opcionales. |
-| <code>SKILLS_REF</code> | <code>main</code> | Rama, tag o commit de los skills. |
+Todo lo ajustable vive aquí. Cámbialo **antes** de instalar:
 
-El servicio escucha solamente en <code>127.0.0.1</code>. Si cambias el puerto,
-reejecuta la provisión para regenerar y reiniciar el servicio.
+| Clave | Por defecto | Qué es |
+|---|---|---|
+| `WSL_DISTRO` | `Debian` | Distribución WSL a usar/instalar. |
+| `OPENCODE_WORKDIR` | `/home/joel` | Carpeta de trabajo del servidor, en `~/code` (ext4 nativo, rápido). |
+| `OPENCODE_SERVE_PORT` | `4096` | Puerto del `opencode serve` (API + web UI en `/app`). El reverse proxy apunta aquí. |
+| `OPENCODE_DOMAIN` | `opencode.local` | Dominio local para el navegador. |
+| `OPENCODE_SERVER_PASSWORD` | *(vacío)* | Basic Auth opcional (usuario `opencode`). Recomendado si expones el puerto. |
+| `OPENCODE_PORT` | `47917` | *(legacy)* Puerto antiguo de `opencode web` por separado. Ya no lo usan ni Arch ni Windows; se mantiene para compatibilidad con setups personalizados. |
 
-## Ajustes de WSL
+---
 
-<code>windows/.wslconfig</code> se copia a
-<code>%USERPROFILE%\.wslconfig</code> y aplica a todas las distros WSL2. Sus
-valores principales son:
+## Qué hace cada clave del `.wslconfig`
 
-| Clave | Valor | Uso |
-|---|---:|---|
-| <code>memory</code> | <code>8GB</code> | Límite de RAM de la VM. |
-| <code>processors</code> | <code>4</code> | Núcleos lógicos disponibles. |
-| <code>networkingMode</code> | <code>mirrored</code> | Comparte <code>localhost</code> entre Windows y WSL. |
-| <code>dnsTunneling</code> | <code>true</code> | Mejora DNS en VPN y redes corporativas. |
-| <code>autoProxy</code> | <code>true</code> | Hereda la configuración de proxy de Windows. |
-| <code>firewall</code> | <code>true</code> | Aplica el Firewall de Windows al tráfico WSL. |
-| <code>autoMemoryReclaim</code> | <code>gradual</code> | Recupera RAM no usada progresivamente. |
-| <code>sparseVhd</code> | <code>true</code> | Reduce el crecimiento de VHDX nuevos. |
+Archivo global de la VM de WSL2 (se copia a `%USERPROFILE%\.wslconfig`). Tras
+editarlo: `wsl --shutdown` y reabrir (la "regla de los ~8 s" de Microsoft).
 
-Después de editar el archivo, ejecuta <code>wsl --shutdown</code>, espera unos
-segundos y vuelve a abrir Debian.
+**Sección `[wsl2]`:**
 
-## Uso diario
+| Clave | Valor | Para qué sirve |
+|---|---|---|
+| `memory` | `8GB` | RAM máxima de la VM. Por defecto WSL toma el 50% del PC. Asume un equipo de ≥16GB (opencode + Chromium + LibreOffice + Docker swapean con menos); bájala a 4GB si tienes menos RAM. |
+| `processors` | `4` | Núcleos lógicos para la VM. |
+| `nestedVirtualization` | `true` | Permite VMs/containers anidados (escenarios de Docker/K8s). |
+| `guiApplications` | `true` | WSLg: apps Linux con interfaz gráfica. |
+| `networkingMode` | `mirrored` | Red en espejo: `localhost` de WSL = `localhost` de Windows (clave para `opencode.local`) y mejor compatibilidad con VPN/Docker. **Requiere Win11 22H2+.** |
+| `dnsTunneling` | `true` | Enruta el DNS de WSL a través de Windows (mejor con VPN/redes corporativas). |
+| `autoProxy` | `true` | Usa el proxy HTTP de Windows dentro de WSL. |
+| `firewall` | `true` | El Firewall de Windows aplica al tráfico de WSL (seguridad). |
 
-~~~powershell
-opencode
-oc
-oc git status
-oc systemctl status opencode-serve
-oc journalctl -u opencode-serve -e
-oc opencode auth login
-oc opencode upgrade
-~~~
+**Sección `[experimental]`:**
 
-- <code>opencode</code> abre el TUI dentro de Debian.
-- <code>oc</code> abre una shell de Debian.
-- <code>oc &lt;comando&gt;</code> ejecuta un comando en Debian.
-- La web se abre en <code>http://localhost:4096/app</code>.
-- El API para la app y los SDK está en <code>http://localhost:4096</code>.
+| Clave | Valor | Para qué sirve |
+|---|---|---|
+| `autoMemoryReclaim` | `gradual` | Devuelve la RAM no usada lentamente. Útil con Docker, que retiene memoria. *(Debe ir aquí y con valor; el default real es `dropCache`.)* |
+| `sparseVhd` | `true` | Los VHDX nuevos se autocompactan: el disco no crece sin control (ideal con Docker). |
 
-Para máximo rendimiento, conserva los repositorios dentro del filesystem Linux
-de WSL. Trabajar directamente sobre <code>/mnt/c</code> o <code>/mnt/d</code>
-añade el coste del puente entre Windows y Linux.
+> **Corrección respecto al borrador inicial:** `autoMemoryReclaim` **no** va en
+> `[wsl2]` ni puede ir sin valor; pertenece a `[experimental]` y requiere
+> `gradual` / `dropCache` / `disabled`. Se añadieron `firewall` y `sparseVhd`
+> como mejoras para Docker.
 
-### Usar otra carpeta temporalmente
+---
 
-~~~bash
+## Por qué este diseño (rendimiento)
+
+OpenCode es intensivo en I/O de disco (LSP, indexado, lecturas masivas). El
+factor de rendimiento más importante es **dónde vive el proyecto**:
+
+- Trabajar sobre `/mnt/c` o `/mnt/d` desde WSL usa el puente 9P Windows↔WSL: es
+  **el caso más lento**.
+- Por eso el servidor opera en **`~/code`** (filesystem **ext4 nativo** de
+  Debian): máximo rendimiento.
+
+Además, el `opencode serve` escucha solo en `127.0.0.1:4096` dentro de WSL; el
+dominio público lo expone el reverse proxy. Con `networkingMode=mirrored`, el
+navegador de Windows llega a `opencode.local` (y a `localhost:4096`)
+directamente, sin configuración extra de red.
+
+---
+
+## Cómo se usa a diario
+
+- `opencode` → abre el TUI de OpenCode dentro de Debian (en `~/code`). Al salir,
+  vuelves a Windows automáticamente.
+- `oc` → abre una shell de Debian (`exit` regresa a Windows).
+- `oc <comando>` → ejecuta un comando en Debian y vuelve. Ej.: `oc git status`.
+- **Web** → abre `http://opencode.local/app` en el navegador de Windows. La
+  sirve el mismo `opencode-serve` permanente; no hay que lanzar nada aparte.
+
+### Comandos útiles dentro de WSL (`oc`)
+
+```bash
+oc systemctl status opencode-serve    # estado del API (servicio permanente)
+oc systemctl status nginx             # (o caddy) estado del proxy
+oc journalctl -u opencode-serve -e    # logs del API
+oc opencode auth login                # configurar el proveedor de IA
+oc opencode upgrade                   # actualizar OpenCode
+```
+
+---
+
+## Usar la web
+
+Abre **`http://opencode.local/app`** en el navegador de Windows. Caddy, en su
+caso: **`https://opencode.local/app`**. La sirve el mismo `opencode-serve` del
+systemd, no hay que lanzar nada aparte.
+
+Como el server está fijado por `WorkingDirectory=` a **`~/code`** (dentro de
+Debian), la web mostrará los proyectos que tengas en esa carpeta. **Para
+añadir proyectos:**
+
+```bash
+oc                                       # entra a shell en Debian
+git clone <url> ~/code/<nombre>          # clona dentro de ~/code (ext4 nativo)
+# o, si el repo ya está en otro sitio fuera de ~/code:
+ln -s /mnt/d/repos/foo ~/code/foo        # symlink (sin coste de copia)
+```
+
+> **Sobre rendimiento (importante):** un symlink a `/mnt/c` o `/mnt/d` **no
+> arregla** el cuello de botella — el server seguirá leyendo NTFS a través
+> del puente 9P (5–30× más lento, file watching no fiable). El máximo
+> rendimiento es con el repo realmente clonado en `~/code` (ext4 nativo).
+> Detalles cuantitativos en la sección [Por qué este diseño (rendimiento)](#por-qué-este-diseño-rendimiento).
+
+**Si necesitas que la web opere sobre OTRA carpeta** (caso raro, p. ej. un
+repo concreto en `/mnt/d`), detén el servicio temporalmente y arranca el server
+a mano en esa ruta:
+
+```bash
 oc
 sudo systemctl stop opencode-serve
-cd /ruta/del/proyecto
-opencode serve --hostname 127.0.0.1 --port 4096
-~~~
+cd /mnt/d/repos/mi-proyecto
+opencode serve --port 4096        # mismo puerto → opencode.local y la app desktop le siguen pegando
+```
 
-Al terminar, detén ese proceso y ejecuta:
+Cuando termines, `sudo systemctl start opencode-serve` te devuelve al setup
+permanente sobre `~/code`.
 
-~~~bash
-sudo systemctl start opencode-serve
-~~~
+---
 
-## App de escritorio en Windows
+## App de escritorio (Windows)
 
-El paso opcional se puede ejecutar por separado:
+La app de escritorio se instala en **Windows** (con Scoop) y se conecta al
+servidor **`opencode serve`** que corre dentro de **WSL**. Lo hace el paso
+`04-desktop.ps1` (el orquestador lo ofrece al final; responde *Sí*).
 
-~~~powershell
+```powershell
 powershell -ExecutionPolicy Bypass -File .\windows\04-desktop.ps1
-~~~
+```
 
-En la app, abre **Configuración → Servidores → Añadir servidor**, registra
-<code>http://localhost:4096</code>, selecciónalo y cierra la aplicación desde su
-menú para que la elección se guarde.
+**Cómo se le indica el servidor.** La app NO usa variables de entorno tipo
+"host" ni lee fielmente `opencode.jsonc` para esto (lo ignora con frecuencia
+y monta su propio server interno llamado `vlocal` en un puerto aleatorio).
+**La única vía 100% confiable es añadir el servidor desde la propia UI:**
 
-Si aparece otro proceso de OpenCode en un puerto aleatorio, la app sigue usando
-su servidor interno. Selecciona la entrada de <code>localhost:4096</code> y
-elimina la entrada local anterior desde la propia interfaz.
+1. Abre la app.
+2. **Configuración → Servidores → `+ Añadir servidor`**.
+3. Pega una de estas URLs (cualquiera funciona; ver tabla más abajo):
+   - `http://localhost:4096` — **recomendado**, directo al serve.
+   - `http://opencode.local` — pasa por nginx (puerto 80 implícito).
+   - `https://opencode.local` — Caddy, requiere la CA importada (ver más abajo).
+4. **Click en la entrada** para activarla (el punto verde debe estar a su lado).
+5. **Cierra la app desde su menú** (Archivo → Salir, o Ctrl+Q). No con `kill -9`,
+   porque interrumpe el guardado en Electron y la selección no persiste.
+6. Reabre. Debe arrancar conectada al servidor correcto.
 
-## Solución de problemas en Windows
+**¿Cuál URL conviene?**
 
-- Si <code>opencode</code> no se reconoce, abre una terminal nueva para recargar
-  el <code>PATH</code>.
-- Si la web no carga, ejecuta <code>oc systemctl status opencode-serve</code> y
-  <code>oc journalctl -u opencode-serve -e</code>.
-- Si Windows no llega al puerto, confirma que <code>.wslconfig</code> usa
-  <code>networkingMode=mirrored</code> y ejecuta <code>wsl --shutdown</code>.
-- Si <code>systemctl</code> indica que <code>systemd</code> no está activo,
-  reejecuta <code>windows/01-setup-wsl.ps1</code>.
-- Si la app de escritorio falla, confirma que el servidor seleccionado es
-  <code>http://localhost:4096</code>.
+| URL | Pasa por proxy | Depende de nginx/Caddy arriba | TLS |
+|---|---|---|---|
+| `http://localhost:4096` | No | No | No |
+| `http://opencode.local` | Sí | Sí | No |
+| `https://opencode.local` | Sí | Sí | Sí, con Caddy + CA importada al **trust store del sistema Windows** (la app Electron no usa el del navegador) |
 
-## Notas sobre Git
+**Para uso normal**, `http://localhost:4096` es lo más robusto: cero dependencias
+extra y sigue funcionando aunque pares nginx.
 
-La provisión WSL aplica:
+> ⚠️ La variable **`OPENCODE_PORT`** **no** sirve para apuntar a un host remoto:
+> si está definida en tu entorno de Windows, la app intentará levantar su **propio
+> servidor local** en ese puerto y fallará la conexión. `04-desktop.ps1` te avisa
+> si la detecta. Bórrala con `setx OPENCODE_PORT ""` si da problemas.
 
-~~~bash
+**Cómo saber si está conectada al server correcto:**
+
+```bash
+oc ss -tlnp | grep opencode
+```
+
+Debe aparecer **solo un LISTEN en `:4096`**. Si ves un segundo puerto random
+(`:43xxx`, `:40xxx`…) ocupado por un proceso `opencode-desktop`, significa
+que la app sigue manteniendo su `vlocal` paralelamente. Vuelve a `+ Añadir
+servidor`, asegúrate de seleccionar la nueva entrada (punto verde) y elimina
+el `Local Server / vlocal` de la lista.
+
+Si la app muestra *"Connection Failed"* o se queda en el splash: arranca WSL una
+vez (`oc`) para que `opencode-serve` esté levantado, y revisa la URL del servidor.
+
+---
+
+## Cambiar de proxy o de puerto/dominio después
+
+1. Edita `config/dotfiles.env`.
+2. Reejecuta solo la provisión:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\windows\install.ps1 -SkipWslSetup -SkipLaunchers
+   ```
+   Vuelve a elegir nginx/Caddy. (Si cambiaste el dominio, reejecuta también `01`
+   para actualizar el `hosts` de Windows.)
+
+---
+
+## HTTPS con Caddy: confiar en el certificado
+
+Caddy usa una **CA local** (`tls internal`). Para que el navegador de Windows no
+muestre advertencia, importa esa CA como entidad de confianza:
+
+```powershell
+# Exporta la CA raíz de Caddy desde WSL a Windows
+oc sudo cat /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt > $env:USERPROFILE\caddy-root.crt
+# Impórtala en "Entidades de certificación raíz de confianza" (PowerShell como Admin)
+Import-Certificate -FilePath $env:USERPROFILE\caddy-root.crt -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+---
+
+## Solución de problemas
+
+- **`opencode` no se reconoce**: abre una terminal nueva (el PATH se actualiza al
+  reabrir).
+- **`opencode.local/app` no carga**: comprueba que el server permanente esté
+  arriba con `oc systemctl status opencode-serve` (debe decir `active (running)`
+  y escuchar en `:4096`). Verifica el proxy con `oc systemctl status nginx` (o
+  `caddy`) y la línea `127.0.0.1 opencode.local` en
+  `C:\Windows\System32\drivers\etc\hosts`. Recuerda añadir `/app` a la URL.
+- **App de escritorio sigue mostrando `vlocal` (puerto random)**: la app no
+  guarda nada al iniciar; tienes que añadir el server desde su propia UI
+  (`+ Añadir servidor` → `http://localhost:4096`) y cerrarla con su menú (no
+  con `kill`) para que persista la elección. Detalles en
+  [App de escritorio](#app-de-escritorio-windows).
+- **Puerto 80 ocupado en Windows**: descomenta `ignoredPorts=80,443` en
+  `.wslconfig`, o cambia de proxy/puerto.
+- **Cambios en `.wslconfig` sin efecto**: `wsl --shutdown`, espera ~8 s y reabre.
+- **`systemctl` dice que systemd no está activo**: reejecuta `01-setup-wsl.ps1`
+  (habilita systemd en `/etc/wsl.conf` y reinicia WSL).
+
+---
+
+## Notas sobre git
+
+Este setup aplica **solo** lo solicitado en WSL:
+
+```bash
 git config --global core.fileMode false
 git config --global core.autocrlf input
-git config --global core.eol lf
-~~~
+```
 
-El repositorio incluye <code>.gitattributes</code> para conservar en LF los
-archivos que se ejecutan dentro de Linux.
+Si además vas a editar/commitear el mismo repo desde el git de **Windows**
+(p. ej. VSCode nativo sobre `/mnt/...`), considera replicar `autocrlf=input` en
+PowerShell y añadir un `.gitattributes` (`* text=auto eol=lf`). Como aquí el
+trabajo vive en `~/code` (nativo de WSL), normalmente no hace falta.
 
+---
 ---
 
 # Arch Linux (nativo)
 
-En Arch no hay capa WSL. El servicio y los proyectos usan directamente el
-filesystem Linux.
+En Arch es **mucho más simple**: es Linux nativo, así que **no** hay WSL, ni
+`.wslconfig`, ni cruce de mundos, ni lanzadores de Windows. systemd ya está
+activo y el sistema de archivos es nativo (máximo rendimiento sin trucos).
 
 ## Qué hace
 
-1. Instala OpenCode desde AUR mediante <code>paru</code> o <code>yay</code>; si
-   no están disponibles, usa el paquete del repositorio oficial.
-2. Instala <code>wl-clipboard</code>, <code>xclip</code> o ambos según la sesión
-   gráfica.
-3. Crea <code>opencode-serve</code> como servicio <code>systemd</code> en
-   <code>127.0.0.1:4096</code>.
-4. Opcionalmente instala la app de escritorio nativa.
+1. Instala **OpenCode** con el comando recomendado:
+   - `paru -S opencode-bin` (o `yay`), AUR siempre al día, si tienes un *AUR helper*.
+   - si no, `sudo pacman -S opencode` (repo oficial *extra*, estable).
+2. Instala las **dependencias gráficas** del portapapeles para el TUI:
+   `wl-clipboard` (Wayland) o `xclip` (X11), según tu sesión.
+3. Levanta el servicio systemd permanente **`opencode-serve`** en `127.0.0.1:4096`.
+   Este único proceso expone a la vez el **API REST** (lo usan la app de escritorio,
+   los SDK y plugins IDE) y la **web UI** en la ruta `/app`. No hace falta
+   `opencode web` aparte.
+4. Instala **nginx** *o* **Caddy** con **`http(s)://opencode.local`** apuntando al
+   `:4096` del serve (lo eliges; nunca ambos). Abre `http://opencode.local/app`
+   en el navegador y ya está.
+5. Opcionalmente: `bash arch/desktop.sh` instala la app de escritorio nativa
+   (`opencode-desktop-bin` de AUR).
 
 ## Instalación
 
-~~~bash
+```bash
 git clone <url-de-este-repo> ~/opencode-dotfiles
 cd ~/opencode-dotfiles
 bash arch/install.sh
-~~~
+```
 
-Ejecuta el instalador como usuario normal. Pedirá <code>sudo</code> únicamente
-cuando sea necesario instalar paquetes o escribir el servicio del sistema.
+Se te preguntará el reverse proxy (nginx por defecto, o Caddy para https).
+Ejecútalo como **tu usuario normal** (no root); pedirá `sudo` cuando haga falta.
 
-## Uso diario
+> Usa la misma `config/dotfiles.env` que Windows (puerto del serve, dominio, etc.).
+> Se ignoran `WSL_DISTRO` (no aplica en Arch nativo) y `OPENCODE_PORT` (es legacy
+> del flujo viejo con `opencode web` como proceso separado; tanto Arch como
+> Windows ahora unifican todo en `opencode serve`).
 
-~~~bash
-opencode
-opencode auth login
-systemctl status opencode-serve
-journalctl -u opencode-serve -e
-opencode upgrade
-~~~
+## Por qué un solo `opencode serve` (y no `serve` + `web` por separado)
 
-- Web UI: <code>http://localhost:4096/app</code>
-- API y app de escritorio: <code>http://127.0.0.1:4096</code>
+A diferencia del setup WSL, en Arch nativo todo corre en la misma máquina, y el
+binario `opencode serve` ya **sirve también la web UI** en la ruta `/app` además
+del API. Un único proceso atiende los tres clientes:
 
-El <code>WorkingDirectory</code> del servicio se toma de
-<code>OPENCODE_WORKDIR</code>. El TUI se puede abrir desde cualquier proyecto y
-trabaja en el directorio actual.
+| Cliente | A dónde se conecta |
+|---|---|
+| Navegador (web UI) | `http://opencode.local/` → proxy → `127.0.0.1:4096/app` |
+| App de escritorio (`opencode-desktop`) | `http://127.0.0.1:4096` (API) |
+| TUI / SDK / plugins IDE | `http://127.0.0.1:4096` (API) |
 
-## App de escritorio en Arch
+Es **menos memoria** (~300 MB vs ~600 MB con dos servers), **menos LSPs duplicados**
+y elimina el problema de sesiones desincronizadas entre web y app desktop.
 
-~~~bash
-bash arch/desktop.sh
-~~~
+El trade-off: el `WorkingDirectory` del systemd está fijado a `~/code`, así que la
+web mostrará por defecto proyectos dentro de esa carpeta (puedes symlinkear los que
+estén en otro sitio). El TUI, en cambio, lo lanzas en cualquier carpeta y trabaja ahí.
 
-En la app, añade <code>http://127.0.0.1:4096</code> en **Configuración →
-Servidores**, selecciona esa entrada y cierra la aplicación desde su menú para
-persistir la elección.
+## Uso diario (Arch)
 
-## Solución de problemas en Arch
+```bash
+opencode                              # TUI, ejecútalo en la carpeta del proyecto
+opencode auth login                   # configurar proveedor de IA (paso obligatorio)
+systemctl status opencode-serve       # ver estado del server
+journalctl -u opencode-serve -e       # logs del server
+opencode upgrade                      # actualizar (o: paru -S opencode-bin)
+```
 
-- Verifica el servicio con <code>systemctl status opencode-serve</code>.
-- Consulta los logs con <code>journalctl -u opencode-serve -e</code>.
-- Confirma el puerto con <code>ss -tlnp | grep 4096</code>.
-- Si la app usa un puerto aleatorio, selecciona explícitamente
-  <code>http://127.0.0.1:4096</code> en su lista de servidores.
+**Web:** abre el navegador en `http://opencode.local/app` (o `https://...` con
+Caddy). Si prefieres directo sin proxy: `http://localhost:4096/app`.
 
+### Configurar la app de escritorio (Arch)
+
+Después de instalarla con `bash arch/desktop.sh`, la app arranca con un servidor
+interno propio (`vlocal`, puerto aleatorio). Para que use tu `opencode-serve`
+permanente, **añádelo desde la propia UI** — es la única vía 100% confiable
+(la app no lee fiablemente `opencode.jsonc` para esto).
+
+1. Abre la app.
+2. **Configuración → Servidores → `+ Añadir servidor`**.
+3. Pega una de estas URLs (cualquiera funciona):
+   - `http://127.0.0.1:4096` — **recomendado**, directo al serve.
+   - `http://opencode.local` — pasa por nginx (puerto 80 implícito).
+   - `https://opencode.local` — Caddy. Requiere importar la CA al **trust store
+     del sistema** (no solo del navegador): `sudo trust anchor /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt && sudo update-ca-trust`.
+4. **Click en la nueva entrada** para activarla (punto verde a su lado).
+5. Elimina `vlocal` de la lista si quieres limpieza.
+6. **Cierra la app desde su menú** (Archivo → Salir, o Ctrl+Q), **no** con
+   `kill -9` — Electron interrumpe el guardado y la elección no persiste.
+7. Reabre. Debe arrancar conectada directamente.
+
+**Comparación de URLs para la app de escritorio:**
+
+| URL | Pasa por proxy | Depende de nginx/Caddy arriba | TLS |
+|---|---|---|---|
+| `http://127.0.0.1:4096` | No | No | No |
+| `http://opencode.local` | Sí | Sí | No |
+| `https://opencode.local` | Sí | Sí | Sí, con Caddy + CA en el trust store del sistema |
+
+Para uso normal, `http://127.0.0.1:4096` es lo más robusto. El dominio solo
+aporta si quieres TLS o una URL bonita; para la app, no añade nada real.
+
+**Verifica que está conectada al server correcto:**
+
+```bash
+ss -tlnp | grep opencode
+```
+
+Debe aparecer **solo un LISTEN en `:4096`**. Si ves un segundo puerto random
+(`:43xxx`, `:40xxx`…) propiedad de un proceso `opencode-desktop`, la app sigue
+manteniendo su `vlocal`. Repite los pasos asegurándote de seleccionar la nueva
+entrada y eliminar el `vlocal`.
+
+## Solución de problemas (Arch)
+
+- **`opencode.local` no carga**: el server permanente debe estar arriba —
+  `systemctl status opencode-serve` (debe decir `active (running)` y escuchar en
+  `:4096`). Verifica también el proxy con `systemctl status nginx` (o `caddy`) y
+  la línea `127.0.0.1 opencode.local` en `/etc/hosts`. Recuerda añadir `/app` a
+  la URL: `http://opencode.local/app`.
+- **nginx no toma el sitio**: en Arch, `nginx.conf` no incluye `conf.d` por
+  defecto; el provision añade ese `include` (con backup). Verifica `nginx -t`.
+- **App de escritorio sigue mostrando `vlocal` (puerto random)**: la app no usa
+  `opencode.jsonc`. Añade el server desde su propia UI (`+ Añadir servidor` →
+  `http://127.0.0.1:4096`) y ciérrala con su menú (no con `kill -9`) para que
+  persista la elección.
+- **HTTPS con Caddy**: la CA local está en
+  `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`. Impórtala
+  en tu navegador para evitar el aviso de certificado.
+
+---
 ---
 
 # Skills y configuración global (paso opcional, válido para Arch y WSL)

@@ -1,0 +1,13 @@
+# Caddyfile - reverse proxy https://__DOMAIN__ -> 127.0.0.1:__PORT__
+# __PORT__ es el del API 'opencode-serve' (4096 por defecto). El propio serve
+# tambien sirve la web UI en la ruta /app, asi que https://__DOMAIN__/app abre
+# la web. En Arch se instala en /etc/caddy/Caddyfile (provision.sh sustituye los marcadores).
+# `tls internal` hace que Caddy genere y administre un certificado TLS local.
+# El soporte de WebSocket es automatico; flush_interval -1 = streaming SSE.
+__DOMAIN__ {
+    tls internal
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:__PORT__ {
+        flush_interval -1
+    }
+}

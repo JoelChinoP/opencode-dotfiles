@@ -7,7 +7,7 @@ $repo   = Get-RepoRoot
 $cfg    = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
 $distro = $cfg['WSL_DISTRO']
 
-Write-Step "2/3 - Aprovisionando $distro (paquetes, opencode, git y servicio)"
+Write-Step "2/3 - Aprovisionando $distro (paquetes, opencode, git, proxy, servicio)"
 
 if (-not (Test-WslDistro -Distro $distro)) {
     throw "$distro no esta instalada. Ejecuta primero 01-setup-wsl.ps1"
@@ -24,6 +24,8 @@ DEST="`$HOME/.config/opencode-dotfiles"
 mkdir -p "`$DEST"
 cp -f "$repoWsl/config/dotfiles.env" "`$DEST/"
 cp -f "$repoWsl/wsl/"*.sh   "`$DEST/" 2>/dev/null || true
+cp -f "$repoWsl/wsl/"*.conf "`$DEST/" 2>/dev/null || true
+cp -f "$repoWsl/wsl/Caddyfile" "`$DEST/" 2>/dev/null || true
 find "`$DEST" -type f -exec sed -i 's/\r`$//' {} +
 chmod +x "`$DEST/"*.sh
 bash "`$DEST/provision.sh"
