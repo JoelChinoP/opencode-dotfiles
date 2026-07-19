@@ -1,6 +1,6 @@
 #requires -Version 5.1
 # 01-setup-wsl.ps1 - Instala/configura WSL2 + Debian, copia .wslconfig,
-# habilita systemd dentro de Debian.
+# habilita systemd dentro de Debian y registra el dominio en el hosts de Windows.
 # REQUIERE Administrador.
 . "$PSScriptRoot\common.ps1"
 Assert-Admin
@@ -8,6 +8,7 @@ Assert-Admin
 $repo    = Get-RepoRoot
 $cfg     = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
 $distro  = $cfg['WSL_DISTRO']
+$domain  = $cfg['OPENCODE_DOMAIN']
 
 Write-Step "1/3 - Configurando WSL2 + $distro"
 
@@ -70,6 +71,18 @@ Write-Ok "$distro establecida como distro por defecto"
 Write-Step "Habilitando systemd en $distro (/etc/wsl.conf)"
 wsl -d $distro -u root -- bash -c "printf '[boot]\nsystemd=true\n' > /etc/wsl.conf"
 Write-Ok "systemd habilitado"
+
+# --- hosts de Windows: dominio -> 127.0.0.1 (para el navegador de Windows) ---
+Write-Step "Registrando $domain en el hosts de Windows"
+$hosts = Join-Path $env:WINDIR 'System32\drivers\etc\hosts'
+$already = $false
+try { $already = [bool](Select-String -Path $hosts -SimpleMatch $domain -Quiet) } catch { $already = $false }
+if (-not $already) {
+    Add-Content -LiteralPath $hosts -Value "127.0.0.1`t$domain"
+    Write-Ok "Anadido: 127.0.0.1 $domain"
+} else {
+    Write-Ok "El hosts ya contenia $domain"
+}
 
 # --- Reiniciar WSL para aplicar .wslconfig + systemd (regla de los ~8s) ---
 Write-Step "Reiniciando WSL para aplicar la configuracion"

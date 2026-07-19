@@ -28,7 +28,7 @@ guiApplications=true
 
 # Red en modo "espejo": WSL comparte la pila de red de Windows.
 #  -> el localhost de WSL == el localhost de Windows (clave para que el
-#     navegador de Windows alcance el servicio en localhost:4096),
+#     navegador de Windows alcance opencode.local sin reglas raras),
 #  -> mejor compatibilidad con VPN y con Docker.
 #  Requiere Windows 11 22H2 o superior (tu build lo cumple).
 networkingMode=mirrored
@@ -56,3 +56,8 @@ autoMemoryReclaim=gradual
 # Hace que los discos VHDX nuevos sean "sparse": se autocompactan y no
 # crecen sin control. Muy util con Docker (las imagenes inflan el disco).
 sparseVhd=true
+
+# (Opcional) Permite que apps Linux escuchen en puertos que Windows ya usa,
+# util en modo mirrored si el puerto 80 del proxy chocara con algo de Windows.
+# Descomenta y ajusta si lo necesitas:
+# ignoredPorts=80,443

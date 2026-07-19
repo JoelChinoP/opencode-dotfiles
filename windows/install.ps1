@@ -2,8 +2,8 @@
 <#
   install.ps1 - Orquesta TODA la instalacion de opencode-dotfiles en Windows.
   Ejecuta en orden:
-    01-setup-wsl.ps1   WSL2 + Debian + .wslconfig + systemd           [requiere Admin]
-    02-provision.ps1   paquetes, opencode, git y servicio (dentro de Debian)
+    01-setup-wsl.ps1   WSL2 + Debian + .wslconfig + systemd + hosts   [requiere Admin]
+    02-provision.ps1   paquetes, opencode, git, proxy y servicio (dentro de Debian)
     03-launchers.ps1   atajos 'opencode' y 'oc' en el PATH de Windows
 
   Uso (terminal normal; se auto-eleva a Administrador con UAC):
@@ -26,7 +26,7 @@ $repo = Get-RepoRoot
 Write-Host "opencode-dotfiles - instalacion" -ForegroundColor Magenta
 Write-Host "Repositorio: $repo"
 
-# El paso 1 (instalar y configurar WSL) requiere Administrador, pero los
+# El paso 1 (instalar WSL / editar el hosts) requiere Administrador, pero los
 # pasos 2-4 deben ir SIN privilegios (Scoop no debe instalarse como admin).
 # Por eso se eleva UNICAMENTE el paso 1, en su propia ventana, y se espera.
 if (-not $SkipWslSetup) {
@@ -56,7 +56,7 @@ $cfg = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
 Write-Step "Instalacion completada"
 Write-Host "  1) Abre una terminal NUEVA (para que tome el PATH)." -ForegroundColor Green
 Write-Host "  2) Ejecuta:  opencode        (abre el TUI dentro de Debian)" -ForegroundColor Green
-Write-Host "  3) Navegador:  http://localhost:$($cfg['OPENCODE_SERVE_PORT'])/app" -ForegroundColor Green
+Write-Host "  3) Navegador:  http(s)://$($cfg['OPENCODE_DOMAIN'])" -ForegroundColor Green
 Write-Host "  4) App de escritorio:  conecta a http://localhost:$($cfg['OPENCODE_SERVE_PORT'])" -ForegroundColor Green
 Write-Host ""
 Read-Host "Pulsa Enter para cerrar esta ventana"
