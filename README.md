@@ -269,13 +269,14 @@ Hasta aquí el setup base te deja `opencode serve` corriendo permanente con la
 web UI y la API. Este paso añade lo que hace falta para que el agente tenga,
 **de fábrica**, las capacidades de uso frecuente: Word/PDF, frontend, testing
 E2E y documentación de Claude; Context7; búsqueda web; Playwright y GitHub
-opt-in; y permisos balanceados.
+opt-in; OpenCode Orchestrator; y permisos balanceados.
 
 Funciona idéntico en **Arch nativo** y **WSL**.
 
 ## Requisitos
 
-- **Node 20+** (recomendado 22+). El setup verifica al arrancar.
+- **Node 24+**. Es un requisito de OpenCode Orchestrator 1.7.8 y el setup lo
+  verifica al arrancar.
 - **Python 3.10+** (recomendado 3.12+). En Arch, el Python global está
   *externally-managed* — por eso usamos venv aislado (no pisa nada).
 - **~3 GB libres** en disco:
@@ -325,19 +326,23 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
    `pptxgenjs`, `@modelcontextprotocol/sdk`, `@playwright/mcp` (el MCP de
    Playwright se lanza desde aquí, sin `npx` por sesión: arranque más rápido
    y sin re-descargas de Chromium cuando `@latest` cambia).
-6. **Genera** `~/.config/opencode/opencode.jsonc` con Context7, Playwright
-   registrado pero deshabilitado, y permisos balanceados. Si ya tenías config,
-   **se mergea** profundo y se hace backup (no se pisa tu `server` ni otras
-   preferencias). Ponytail se elimina de la configuración global; se activa
-   únicamente por proyecto.
-7. **Genera** un `~/.config/opencode/AGENTS.md` global breve: idioma español,
+6. **Registra OpenCode Orchestrator 1.7.8** con cuatro Workers como máximo y
+   perfiles independientes: Commander Sol `high`, Planner Terra `high`, Worker
+   Terra `medium` y Reviewer Sol `xhigh`. OpenCode descarga el paquete fijado en
+   su caché al arrancar; no se instala con `npm -g`.
+7. **Genera** `~/.config/opencode/opencode.jsonc` con Context7, Playwright
+   registrado pero deshabilitado, Orchestrator y permisos balanceados. Si ya
+   tenías config, **se mergea** profundo y se hace backup (no se pisa tu
+   `server` ni plugins distintos). Ponytail se elimina de la configuración
+   global; se activa únicamente por proyecto.
+8. **Genera** un `~/.config/opencode/AGENTS.md` global breve: idioma español,
    documentación actual cuando haga falta y verificación proporcional.
-8. **Hook al shell**: añade una función `opencode()` a `~/.zshrc` (y
+9. **Hook al shell**: añade una función `opencode()` a `~/.zshrc` (y
    `~/.bashrc` si existe) que inyecta los paths aislados solo en esa
    invocación. **No contamina tu shell normal**.
-9. **Reinicia `opencode-serve`** para que el systemd también cargue el venv
+10. **Reinicia `opencode-serve`** para que el systemd también cargue el venv
    y los módulos Node aislados.
-10. **Smoke test** automático al final.
+11. **Smoke test** automático al final.
 
 ## Aislamiento — por qué no rompe tus otros proyectos
 
@@ -346,6 +351,9 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
 - **Node**: las libs viven en `~/.opencode-skills/node`, no en `npm -g`.
   `NODE_PATH` actúa como **fallback** (Node prefiere `./node_modules` local),
   así que tus repos resuelven sus propias deps sin interferencia.
+- **Orchestrator**: OpenCode administra el paquete fijado en su propia caché
+  (`~/.cache/opencode/packages`), separada de los `node_modules` del
+  proyecto y del stack de skills.
 - **Shell**: la función `opencode()` usa un subshell `( ... )` para exportar
   las variables; al volver tu shell queda como antes. Si ejecutas `node` o
   `python` por fuera de `opencode`, ves tu entorno normal.
@@ -419,6 +427,44 @@ El GitHub MCP **infla bastante el contexto** (muchas tools). Por eso queda
 y deja que el agente use `gh` por bash (`gh pr view`, `gh issue list`,
 `gh search code`). El `AGENTS.md` global ya recomienda este enfoque.
 
+## Usar OpenCode Orchestrator
+
+Orchestrator toma el control del selector de agentes: `Commander` queda como
+agente primario y predeterminado, mientras `Planner`, `Worker` y `Reviewer`
+quedan como subagentes. La versión 1.7.8 además oculta `Build` y convierte
+`Plan` en subagente; por eso no funciona como un tercer modo equivalente a los
+dos modos nativos.
+
+Un prompt normal dirigido a `Commander` usa su perfil de orquestación, pero no
+activa el bucle persistente. Para una misión grande, abre OpenCode desde la raíz
+del repositorio y escribe:
+
+```text
+/task "Implementa el cambio solicitado. Conserva compatibilidad, ejecuta las pruebas relevantes y documenta los riesgos restantes."
+```
+
+`/task` activa el bucle persistente. El flujo interno es Commander → Planner →
+hasta cuatro Workers → Reviewer. El estado y las evidencias de cada misión se
+guardan dentro de `.opencode/` en el proyecto. Para detener la misión usa
+`/stop` o `/cancel`; `Esc` interrumpe el turno actual. `/plan "objetivo"` crea
+solo el plan y `/agents` muestra la arquitectura del plugin.
+
+### Compatibilidad con otros plugins
+
+- En esta configuración global Orchestrator es el único plugin activo.
+  Context7 y Playwright son MCP, no plugins, por lo que no compiten por
+  `/task`.
+- Ponytail sigue siendo opt-in por proyecto. Sus comandos usan el prefijo
+  `/ponytail`, no `/task`, y el merger conserva ambas entradas de plugin. Sí
+  añade instrucciones a cada turno, por lo que conviene habilitarlo solo cuando
+  realmente quieras sus reglas además de las de Orchestrator.
+- Sí habría riesgo de colisión si otro plugin o comando personalizado registra
+  también `/task`, `/plan`, `/agents`, `/stop` o `/cancel`, o define agentes
+  llamados `Commander`, `Planner`, `Worker` o `Reviewer`. No actives dos
+  orquestadores simultáneos.
+- OpenCode ejecuta en secuencia los hooks de todos los plugins. Si añades otro,
+  revisa sus comandos y agentes antes de habilitarlo globalmente.
+
 ## Estructura de permisos balanceada
 
 El `opencode.jsonc` que se genera trae un bloque `permission` con esta
@@ -450,8 +496,8 @@ bash config/skills-smoke-test.sh
 
 Imprime OK/MISS por cada componente: imports Python, requires Node, binarios
 del sistema, presencia del conjunto reducido de skills, validez del
-`opencode.jsonc`, hook
-en el shell, `opencode-serve` activo y MCP de Context7 alcanzable.
+`opencode.jsonc`, perfiles y opciones de Orchestrator, hook en el shell,
+`opencode-serve` activo y MCP de Context7 alcanzable.
 
 Exit code = número de fallos (0 si todo OK).
 
@@ -498,3 +544,6 @@ Si quieres quitarlos: `sudo pacman -Rs libreoffice-still poppler ...`.
   `~/.config/opencode/skills-env.sh` existe y que `opencode-serve.sh` en
   `~/.config/opencode-dotfiles/` tiene el `source` (el `skills.sh` lo
   re-copia automáticamente).
+- **`/task` no aparece**: cierra todas las sesiones de OpenCode, confirma que
+  la versión fijada existe en el bloque `plugin`, abre OpenCode otra vez y
+  revisa `/tmp/opencode-orchestrator.log`.

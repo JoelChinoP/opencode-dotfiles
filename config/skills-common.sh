@@ -69,7 +69,7 @@ log "Step 0 - chequeo de runtimes"
 node_ok() {
     have node || return 1
     local maj; maj=$(node -p 'process.versions.node' 2>/dev/null | cut -d. -f1)
-    [ -n "$maj" ] && [ "$maj" -ge 20 ] 2>/dev/null
+    [ -n "$maj" ] && [ "$maj" -ge 24 ] 2>/dev/null
 }
 python_ok() {
     have python3 || return 1
@@ -102,7 +102,7 @@ fi
 have python3 || die "python3 sigue ausente tras el intento de instalacion"
 PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 python_ok || die "se requiere Python 3.10+ (tienes $PYVER)"
-node_ok   || die "se requiere Node 20+ (tienes $(node -v 2>/dev/null || echo ninguno))"
+node_ok   || die "se requiere Node 24+ para OpenCode Orchestrator 1.7.8 (tienes $(node -v 2>/dev/null || echo ninguno))"
 have npm  || die "falta npm (deberia venir con node)"
 have jq   || die "falta jq"
 echo "  Python $PYVER  /  Node $(node -p 'process.versions.node')  OK"
@@ -269,7 +269,11 @@ fi
 # Ejecutar el merger usando el python del venv (donde json5 esta instalado).
 if ! "$PYVENV/bin/python" "$CONFIG_DIR/skills-merge-jsonc.py" \
         "${CFG_FILE:-/dev/null}" "$TMPL" \
-        --remove-plugin "@dietrichgebert/ponytail" >"$TMP_OUT"; then
+        --remove-plugin "@dietrichgebert/ponytail" \
+        --remove-agent commander \
+        --remove-agent planner \
+        --remove-agent worker \
+        --remove-agent reviewer >"$TMP_OUT"; then
     die "fallo el merge del opencode.jsonc; revisa $CFG_FILE manualmente. Backup en $BAK"
 fi
 # Validar resultado
