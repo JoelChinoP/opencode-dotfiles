@@ -269,7 +269,7 @@ Hasta aquí el setup base te deja `opencode serve` corriendo permanente con la
 web UI y la API. Este paso añade lo que hace falta para que el agente tenga,
 **de fábrica**, las capacidades de uso frecuente: Word/PDF, frontend, testing
 E2E y documentación de Claude; Context7; búsqueda web; Playwright y GitHub
-opt-in; y permisos balanceados.
+opt-in; Ponytail apagado por defecto; y permisos balanceados.
 
 Funciona idéntico en **Arch nativo** y **WSL**.
 
@@ -297,8 +297,8 @@ bash arch/skills.sh
 oc bash ~/opencode-dotfiles/wsl/skills.sh
 ```
 
-El script es **idempotente**: puedes reejecutarlo cuando quieras (actualiza
-skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta).
+El script es **idempotente**: puedes reejecutarlo cuando quieras (actualiza el
+ref configurado de skills y reinstala deps Python/Node solo si hace falta).
 
 ## Qué hace, paso a paso
 
@@ -306,7 +306,8 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
    en Debian/WSL solo writer/calc/impress con `--no-install-recommends`, que
    ahorra >1 GB), poppler, qpdf, tesseract, pandoc, ghostscript, imagemagick,
    ffmpeg, jq, rsync.
-2. **Clona 7 skills frecuentes** de `anthropics/skills` a
+2. **Clona 7 skills frecuentes** de `anthropics/skills` mediante una caché
+   reutilizable en `~/.cache/opencode-dotfiles/` y los sincroniza a
    `~/.config/opencode/skills/`:
    - **Documentos:** `docx`, `pdf`, `doc-coauthoring`
    - **Frontend:** `frontend-design`
@@ -325,19 +326,22 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
    `pptxgenjs`, `@modelcontextprotocol/sdk`, `@playwright/mcp` (el MCP de
    Playwright se lanza desde aquí, sin `npx` por sesión: arranque más rápido
    y sin re-descargas de Chromium cuando `@latest` cambia).
-6. **Genera** `~/.config/opencode/opencode.jsonc` con Context7, Playwright
-   registrado pero deshabilitado, y permisos balanceados. Si ya tenías config,
-   **se mergea** profundo y se hace backup (no se pisa tu `server` ni otras
-   preferencias). Ponytail se elimina de la configuración global; se activa
-   únicamente por proyecto.
-7. **Genera** un `~/.config/opencode/AGENTS.md` global breve: idioma español,
+6. **Genera** `~/.config/opencode/opencode.jsonc` con Build predeterminado,
+   Context7, Playwright registrado pero deshabilitado, Ponytail 4.8.4 y permisos
+   balanceados. Si ya tenías config, **se mergea** profundo y se hace backup
+   (no se pisa tu `server` ni plugins distintos). También elimina cualquier
+   configuración anterior de OpenCode Orchestrator.
+7. **Configura Ponytail en `off`** mediante
+   `~/.config/ponytail/config.json`. El plugin queda disponible, pero no inyecta
+   reglas hasta que lo actives explícitamente.
+8. **Genera** un `~/.config/opencode/AGENTS.md` global breve: idioma español,
    documentación actual cuando haga falta y verificación proporcional.
-8. **Hook al shell**: añade una función `opencode()` a `~/.zshrc` (y
+9. **Hook al shell**: añade una función `opencode()` a `~/.zshrc` (y
    `~/.bashrc` si existe) que inyecta los paths aislados solo en esa
    invocación. **No contamina tu shell normal**.
-9. **Reinicia `opencode-serve`** para que el systemd también cargue el venv
+10. **Reinicia `opencode-serve`** para que el systemd también cargue el venv
    y los módulos Node aislados.
-10. **Smoke test** automático al final.
+11. **Smoke test** automático al final.
 
 ## Aislamiento — por qué no rompe tus otros proyectos
 
@@ -346,6 +350,9 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
 - **Node**: las libs viven en `~/.opencode-skills/node`, no en `npm -g`.
   `NODE_PATH` actúa como **fallback** (Node prefiere `./node_modules` local),
   así que tus repos resuelven sus propias deps sin interferencia.
+- **Ponytail**: en modo `off` registra sus comandos y skills, pero no añade su
+  ruleset al prompt. El plugin está fijado a una versión concreta para evitar
+  cambios silenciosos de instrucciones.
 - **Shell**: la función `opencode()` usa un subshell `( ... )` para exportar
   las variables; al volver tu shell queda como antes. Si ejecutas `node` o
   `python` por fuera de `opencode`, ves tu entorno normal.
@@ -390,18 +397,22 @@ un proyecto, añade a su `opencode.jsonc`:
 
 Reinicia OpenCode después de cambiar configuración.
 
-## Activar Ponytail por proyecto (opcional)
+## Usar Ponytail bajo demanda
 
-Ponytail no se carga globalmente. En el proyecto donde quieras usarlo, añade:
+Ponytail se carga globalmente, pero inicia en `off`: sus reglas no consumen
+contexto hasta que eliges un modo. Los cambios se aplican desde el mensaje
+siguiente y permanecen hasta que vuelves a cambiarlos.
 
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@dietrichgebert/ponytail"]
-}
+```text
+/ponytail lite   # desarrollo normal; simplificación moderada
+/ponytail full   # refactor o simplificación activa
+/ponytail off    # arquitectura, seguridad o volver al agente normal
 ```
 
-Así sus instrucciones y seis skills solo consumen contexto en ese proyecto.
+El valor inicial vive en `~/.config/ponytail/config.json`. El modo activo se
+guarda en `~/.config/opencode/.ponytail-active`; por eso conviene terminar una
+tarea con `/ponytail off`. `/ponytail-review` revisa el diff actual sin cambiar
+el modo.
 
 ## Activar el MCP de GitHub (opcional)
 
@@ -450,8 +461,9 @@ bash config/skills-smoke-test.sh
 
 Imprime OK/MISS por cada componente: imports Python, requires Node, binarios
 del sistema, presencia del conjunto reducido de skills, validez del
-`opencode.jsonc`, hook
-en el shell, `opencode-serve` activo y MCP de Context7 alcanzable.
+`opencode.jsonc`, Build predeterminado, ausencia de Orchestrator, configuración
+de Ponytail, hook en el shell, `opencode-serve` activo y MCP de Context7
+alcanzable.
 
 Exit code = número de fallos (0 si todo OK).
 

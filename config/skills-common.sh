@@ -15,6 +15,9 @@ SKILL_DIR="$OPENCODE_CFG_DIR/skills"
 PYVENV="$HOME/.venvs/opencode-skills"
 NODE_AISLADO="$HOME/.opencode-skills/node"
 SKILLS_ENV_FILE="$OPENCODE_CFG_DIR/skills-env.sh"
+PONYTAIL_CFG_DIR="$HOME/.config/ponytail"
+PONYTAIL_CFG_FILE="$PONYTAIL_CFG_DIR/config.json"
+PONYTAIL_STATE_FILE="$OPENCODE_CFG_DIR/.ponytail-active"
 DEST="$HOME/.config/opencode-dotfiles"  # donde provision.sh copia los scripts del systemd
 
 # Skills de uso frecuente instalados desde anthropics/skills.
@@ -57,7 +60,7 @@ source "$CONFIG_DIR/dotfiles.env"
 : "${SKILLS_REPO:=https://github.com/anthropics/skills}"
 : "${SKILLS_REF:=main}"
 
-mkdir -p "$OPENCODE_CFG_DIR" "$SKILL_DIR" "$NODE_AISLADO" "$DEST"
+mkdir -p "$OPENCODE_CFG_DIR" "$SKILL_DIR" "$NODE_AISLADO" "$PONYTAIL_CFG_DIR" "$DEST"
 
 # --- Step 0: sanity de runtimes -------------------------------------------------
 log "Step 0 - chequeo de runtimes"
@@ -110,12 +113,14 @@ echo "  Python $PYVER  /  Node $(node -p 'process.versions.node')  OK"
 # --- Step 2: clonar skills (sparse-checkout) -----------------------------------
 # Step 1 (binarios) lo hizo ya el wrapper de plataforma.
 log "Step 2 - clonar/actualizar skills desde $SKILLS_REPO ($SKILLS_REF)"
-CLONE_DIR="/tmp/anthropic-skills-clone"
+CLONE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/opencode-dotfiles/anthropic-skills"
+mkdir -p "$(dirname "$CLONE_DIR")"
 if [ -d "$CLONE_DIR/.git" ]; then
     git -C "$CLONE_DIR" fetch --depth 1 origin "$SKILLS_REF" >/dev/null
     git -C "$CLONE_DIR" reset --hard "FETCH_HEAD" >/dev/null
 else
-    rm -rf "$CLONE_DIR"
+    [ ! -e "$CLONE_DIR" ] \
+        || die "$CLONE_DIR existe pero no es un clon git; muevelo o eliminalo manualmente"
     git clone --depth 1 --filter=blob:none --sparse \
         --branch "$SKILLS_REF" "$SKILLS_REPO" "$CLONE_DIR" >/dev/null
     git -C "$CLONE_DIR" sparse-checkout set skills >/dev/null
@@ -261,6 +266,7 @@ TMPL="$CONFIG_DIR/opencode.jsonc.tmpl"
 TMP_OUT="$(mktemp --tmpdir opencode.jsonc.XXXXXX)"
 trap 'rm -f "$TMP_OUT"' EXIT
 
+BAK="(no se creo backup: el archivo no existia)"
 if [ -f "$CFG_FILE" ]; then
     BAK="$CFG_FILE.bak-$(date +%Y%m%d-%H%M%S)"
     cp -f "$CFG_FILE" "$BAK"
@@ -269,7 +275,15 @@ fi
 # Ejecutar el merger usando el python del venv (donde json5 esta instalado).
 if ! "$PYVENV/bin/python" "$CONFIG_DIR/skills-merge-jsonc.py" \
         "${CFG_FILE:-/dev/null}" "$TMPL" \
-        --remove-plugin "@dietrichgebert/ponytail" >"$TMP_OUT"; then
+        --remove-plugin "opencode-orchestrator" \
+        --remove-agent Commander \
+        --remove-agent Planner \
+        --remove-agent Worker \
+        --remove-agent Reviewer \
+        --remove-agent commander \
+        --remove-agent planner \
+        --remove-agent worker \
+        --remove-agent reviewer >"$TMP_OUT"; then
     die "fallo el merge del opencode.jsonc; revisa $CFG_FILE manualmente. Backup en $BAK"
 fi
 # Validar resultado
@@ -280,8 +294,28 @@ mv -f "$TMP_OUT" "$CFG_FILE"
 chmod 0600 "$CFG_FILE"
 echo "  $CFG_FILE actualizado"
 
-# --- Step 9: AGENTS.md global --------------------------------------------------
-log "Step 9 - AGENTS.md global"
+# --- Step 9: Ponytail global apagado -------------------------------------------
+log "Step 9 - Ponytail global (modo inicial off)"
+PONYTAIL_TMPL="$CONFIG_DIR/ponytail.json.tmpl"
+TMP_OUT="$(mktemp --tmpdir ponytail.json.XXXXXX)"
+PONYTAIL_BAK="(no se creo backup: el archivo no existia)"
+if [ -f "$PONYTAIL_CFG_FILE" ]; then
+    PONYTAIL_BAK="$PONYTAIL_CFG_FILE.bak-$(date +%Y%m%d-%H%M%S)"
+    cp -f "$PONYTAIL_CFG_FILE" "$PONYTAIL_BAK"
+    echo "  backup: $PONYTAIL_BAK"
+fi
+if ! "$PYVENV/bin/python" "$CONFIG_DIR/skills-merge-jsonc.py" \
+        "${PONYTAIL_CFG_FILE:-/dev/null}" "$PONYTAIL_TMPL" >"$TMP_OUT"; then
+    die "fallo el merge de Ponytail. Backup en $PONYTAIL_BAK"
+fi
+mv -f "$TMP_OUT" "$PONYTAIL_CFG_FILE"
+chmod 0600 "$PONYTAIL_CFG_FILE"
+printf '%s\n' off >"$PONYTAIL_STATE_FILE"
+chmod 0600 "$PONYTAIL_STATE_FILE"
+echo "  $PONYTAIL_CFG_FILE actualizado; modo activo: off"
+
+# --- Step 10: AGENTS.md global -------------------------------------------------
+log "Step 10 - AGENTS.md global"
 AGENTS_FILE="$OPENCODE_CFG_DIR/AGENTS.md"
 AGENTS_TMPL="$CONFIG_DIR/AGENTS.md.tmpl"
 if [ -f "$AGENTS_FILE" ]; then
@@ -299,8 +333,8 @@ else
     echo "  $AGENTS_FILE creado"
 fi
 
-# --- Step 10: re-copiar opencode-serve.sh al DEST (con source del env) ---------
-log "Step 10 - actualizar opencode-serve.sh en $DEST"
+# --- Step 11: re-copiar opencode-serve.sh al DEST (con source del env) ---------
+log "Step 11 - actualizar opencode-serve.sh en $DEST"
 SRC_SERVE="$REPO_DIR/$PLATFORM/opencode-serve.sh"
 if [ -f "$SRC_SERVE" ]; then
     cp -f "$SRC_SERVE" "$DEST/opencode-serve.sh"
@@ -316,8 +350,8 @@ else
     warn "no se encontro $SRC_SERVE; ejecuta provision.sh antes de skills.sh"
 fi
 
-# --- Step 11: smoke test -------------------------------------------------------
-log "Step 11 - smoke test"
+# --- Step 12: smoke test -------------------------------------------------------
+log "Step 12 - smoke test"
 bash "$CONFIG_DIR/skills-smoke-test.sh" || warn "el smoke test reporto fallos; revisalos"
 
 echo ""
@@ -327,6 +361,7 @@ echo "   Skills:        $SKILL_DIR  (${#SKILLS[@]} skills)"
 echo "   venv Python:   $PYVENV"
 echo "   node aislado:  $NODE_AISLADO"
 echo "   Config:        $OPENCODE_CFG_DIR/opencode.jsonc"
+echo "   Ponytail:      $PONYTAIL_CFG_FILE  (off por defecto)"
 echo "   Reglas:        $OPENCODE_CFG_DIR/AGENTS.md"
 echo "   Env file:      $SKILLS_ENV_FILE"
 echo ""
@@ -337,6 +372,7 @@ echo " Tokens opcionales (exportalos en tu shell rc si los quieres):"
 echo "   CONTEXT7_API_KEY   - mayor rate-limit en docs (https://context7.com)"
 echo "   GITHUB_TOKEN       - GitHub MCP (descomenta tambien el bloque en"
 echo "                        $CFG_FILE)"
-echo " Playwright MCP y Ponytail quedan desactivados hasta que un proyecto los habilite."
+echo " Playwright MCP queda desactivado hasta que un proyecto lo habilite."
+echo " Ponytail queda cargado pero en off; activalo con /ponytail lite o full."
 echo " Exa/websearch queda habilitado globalmente."
 echo "============================================================"

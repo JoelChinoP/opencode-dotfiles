@@ -12,6 +12,8 @@ PYBIN="$HOME/.venvs/opencode-skills/bin/python"
 NODEDIR="$HOME/.opencode-skills/node/node_modules"
 CFG="$HOME/.config/opencode/opencode.jsonc"
 SKILLDIR="$HOME/.config/opencode/skills"
+PONYTAIL_CFG="$HOME/.config/ponytail/config.json"
+PONYTAIL_STATE="$HOME/.config/opencode/.ponytail-active"
 
 echo "==> Imports de Python (venv ~/.venvs/opencode-skills)"
 if [ ! -x "$PYBIN" ]; then
@@ -83,11 +85,19 @@ import json5, pathlib, sys
 cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
 raise SystemExit(0 if cfg.get("mcp", {}).get("playwright", {}).get("enabled") is False else 1)
 PY
-    if grep -q '@dietrichgebert/ponytail' "$CFG"; then
-        miss "Ponytail opt-in" "sigue presente en la config global"
-    else
-        ok "Ponytail opt-in"
-    fi
+    "$PYBIN" - "$CFG" <<'PY' 2>/dev/null \
+        && ok "Build + Ponytail 4.8.4; sin Orchestrator" \
+        || miss "plugins globales" "debe quedar Build con Ponytail, sin Orchestrator"
+import json5, pathlib, sys
+cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
+assert cfg.get("default_agent") == "build"
+specs = [item[0] if isinstance(item, list) and item else item
+         for item in cfg.get("plugin", [])]
+assert "@dietrichgebert/ponytail@4.8.4" in specs
+assert not any(isinstance(spec, str) and "opencode-orchestrator" in spec for spec in specs)
+assert not ({"Commander", "Planner", "Worker", "Reviewer",
+             "commander", "planner", "worker", "reviewer"} & set(cfg.get("agent", {})))
+PY
     "$PYBIN" - "$CFG" <<'PY' 2>/dev/null \
         && ok "Exa/websearch habilitado" \
         || miss "Exa/websearch" "debe tener permission.websearch=allow"
@@ -98,6 +108,28 @@ PY
     grep -q '"permission"' "$CFG" && ok "bloque permission" || miss "permission" "no presente"
 else
     miss "opencode.jsonc" "$CFG no existe"
+fi
+
+if [ -f "$PONYTAIL_CFG" ]; then
+    "$PYBIN" - "$PONYTAIL_CFG" <<'PY' 2>/dev/null \
+        && ok "Ponytail defaultMode=off" \
+        || miss "Ponytail config" "defaultMode debe ser off"
+import json, pathlib, sys
+cfg = json.loads(pathlib.Path(sys.argv[1]).read_text())
+raise SystemExit(0 if cfg.get("defaultMode") == "off" else 1)
+PY
+else
+    miss "Ponytail config" "$PONYTAIL_CFG no existe"
+fi
+
+if [ -f "$PONYTAIL_STATE" ]; then
+    PONYTAIL_MODE=$(tr -d '[:space:]' <"$PONYTAIL_STATE")
+    case "$PONYTAIL_MODE" in
+        off|lite|full|ultra) ok "Ponytail modo activo: $PONYTAIL_MODE" ;;
+        *) miss "Ponytail modo activo" "valor invalido: ${PONYTAIL_MODE:-vacio}" ;;
+    esac
+else
+    ok "Ponytail modo activo: off (usa defaultMode)"
 fi
 
 if [ -f "$HOME/.config/opencode/AGENTS.md" ]; then
