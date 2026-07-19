@@ -15,9 +15,12 @@
     },
     "playwright": {
       "type": "local",
+      "enabled": false,
       // Instalado por skills.sh en el node_modules aislado (Step 5). Lanzarlo
       // directo evita el cold-start de npx (resolver @latest contra el registry
       // en cada sesion) y que un bump de @latest descargue otro Chromium.
+      // Activalo solo en el opencode.jsonc del proyecto que lo necesite con:
+      // "mcp": { "playwright": { "enabled": true } }
       "command": ["node", "{env:HOME}/.opencode-skills/node/node_modules/@playwright/mcp/cli.js"]
     }
     // ---- GitHub MCP (opt-in) ----
@@ -36,9 +39,6 @@
     // }
   },
 
-  // Ponytail se aplica globalmente en cada turno y añade /ponytail*.
-  "plugin": ["@dietrichgebert/ponytail"],
-
   // ============================================================
   //  Permisos
   //  Regla: dentro de cada herramienta (read, bash, ...), el ULTIMO
@@ -48,7 +48,8 @@
   "permission": {
     "edit": "allow",
     "webfetch": "allow",
-    "agent": "ask",
+    "websearch": "allow",
+    "task": "ask",
     "skill": { "*": "allow" },
 
     "read": {

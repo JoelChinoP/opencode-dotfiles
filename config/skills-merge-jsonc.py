@@ -3,7 +3,7 @@
 skills-merge-jsonc.py - merge profundo de dos archivos JSONC.
 
 Uso:
-    python3 skills-merge-jsonc.py BASE OVERLAY > OUT
+    python3 skills-merge-jsonc.py BASE OVERLAY [--remove-plugin NAME] > OUT
 
 El OVERLAY gana en colisiones de hojas; los dicts se mergean recursivamente.
 Usa json5 para tolerar comments del JSONC (// y /*..*/) y trailing commas.
@@ -47,8 +47,8 @@ def load(path):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"Uso: {sys.argv[0]} BASE OVERLAY > OUT", file=sys.stderr)
+    if len(sys.argv) not in (3, 5) or (len(sys.argv) == 5 and sys.argv[3] != "--remove-plugin"):
+        print(f"Uso: {sys.argv[0]} BASE OVERLAY [--remove-plugin NAME] > OUT", file=sys.stderr)
         sys.exit(2)
     base = load(sys.argv[1])
     overlay = load(sys.argv[2])
@@ -59,6 +59,15 @@ def main():
         print(f"ERROR: {sys.argv[2]} no es un objeto JSON", file=sys.stderr)
         sys.exit(1)
     merged = deep_merge(base, overlay)
+    if len(sys.argv) == 5:
+        plugin = sys.argv[4]
+        plugins = merged.get("plugin")
+        if isinstance(plugins, list):
+            plugins = [item for item in plugins if item != plugin]
+            if plugins:
+                merged["plugin"] = plugins
+            else:
+                merged.pop("plugin", None)
     json.dump(merged, sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
 

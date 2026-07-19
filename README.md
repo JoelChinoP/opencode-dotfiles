@@ -489,9 +489,9 @@ entrada y eliminar el `vlocal`.
 
 Hasta aquí el setup base te deja `opencode serve` corriendo permanente con la
 web UI y la API. Este paso añade lo que hace falta para que el agente tenga,
-**de fábrica**, las capacidades que Claude trae en su chat: crear/editar Word,
-PDF, PPT y Excel; arte generativo; testing E2E; MCPs útiles (Context7,
-Playwright, GitHub opcional); búsqueda web; y un set de permisos balanceado.
+**de fábrica**, las capacidades de uso frecuente: Word/PDF, frontend, testing
+E2E y documentación de Claude; Context7; búsqueda web; Playwright y GitHub
+opt-in; y permisos balanceados.
 
 Funciona idéntico en **Arch nativo** y **WSL**.
 
@@ -528,14 +528,16 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
    en Debian/WSL solo writer/calc/impress con `--no-install-recommends`, que
    ahorra >1 GB), poppler, qpdf, tesseract, pandoc, ghostscript, imagemagick,
    ffmpeg, jq, rsync.
-2. **Clona los 17 skills** de `anthropics/skills` a `~/.config/opencode/skills/`:
-   - **Documentos:** `docx`, `pdf`, `pptx`, `xlsx`
-   - **Diseño/Arte:** `algorithmic-art`, `brand-guidelines`, `canvas-design`,
-     `theme-factory`, `slack-gif-creator`
-   - **Frontend:** `frontend-design`, `web-artifacts-builder`
+2. **Clona 7 skills frecuentes** de `anthropics/skills` a
+   `~/.config/opencode/skills/`:
+   - **Documentos:** `docx`, `pdf`, `doc-coauthoring`
+   - **Frontend:** `frontend-design`
    - **Testing:** `webapp-testing` (Playwright Python)
-   - **Comunicación:** `internal-comms`, `doc-coauthoring`, `claude-api`
-   - **Meta:** `skill-creator`, `mcp-builder`
+   - **API de Claude:** `claude-api`
+   - **Meta:** `skill-creator`
+   El perfil agresivo retira los 10 skills de bajo uso que instalaban versiones
+   anteriores. Skills externos como `context7-mcp` o `mermaid-diagram` no son
+   administrados por este listado y se conservan si ya existen.
 3. **venv Python aislado** en `~/.venvs/opencode-skills` con: `python-docx`,
    `openpyxl`, `pandas`, `pypdf`, `pdfplumber`, `reportlab`, `pytesseract`,
    `pdf2image`, `markitdown[all]`, `Pillow`, `beautifulsoup4`, `markdown`,
@@ -545,11 +547,13 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
    `pptxgenjs`, `@modelcontextprotocol/sdk`, `@playwright/mcp` (el MCP de
    Playwright se lanza desde aquí, sin `npx` por sesión: arranque más rápido
    y sin re-descargas de Chromium cuando `@latest` cambia).
-6. **Genera** `~/.config/opencode/opencode.jsonc` con MCP (Context7,
-   Playwright) y permisos balanceados. Si ya tenías config, **se mergea**
-   profundo y se hace backup (no se pisa nada de tu `server`/preferencias).
-7. **Genera** `~/.config/opencode/AGENTS.md` con reglas globales (usar
-   Context7 para docs, skills para Office, web search via Exa, idioma español).
+6. **Genera** `~/.config/opencode/opencode.jsonc` con Context7, Playwright
+   registrado pero deshabilitado, y permisos balanceados. Si ya tenías config,
+   **se mergea** profundo y se hace backup (no se pisa tu `server` ni otras
+   preferencias). Ponytail se elimina de la configuración global; se activa
+   únicamente por proyecto.
+7. **Genera** un `~/.config/opencode/AGENTS.md` global breve: idioma español,
+   documentación actual cuando haga falta y verificación proporcional.
 8. **Hook al shell**: añade una función `opencode()` a `~/.zshrc` (y
    `~/.bashrc` si existe) que inyecta los paths aislados solo en esa
    invocación. **No contamina tu shell normal**.
@@ -568,18 +572,17 @@ skills con `git pull --ff-only` y reinstala deps Python/Node solo si hace falta)
   las variables; al volver tu shell queda como antes. Si ejecutas `node` o
   `python` por fuera de `opencode`, ves tu entorno normal.
 
-## Tokens opcionales (mejoran funcionalidades, no son obligatorios)
+## Web search y tokens opcionales
 
-Hay **un solo lugar recomendado** para meterlos: tu `~/.zshrc` (o `~/.bashrc`)
-o un archivo dedicado `~/.opencode-env` que sourceas desde el rc. La
-función `opencode()` que añade `skills.sh` los hereda automáticamente.
+Para opciones que deban llegar tanto al TUI como a `opencode-serve`, usa
+`~/.config/opencode/skills-env.local.sh`. El instalador lo carga pero no lo
+crea ni sobrescribe; protégelo con permisos `0600` si contiene claves.
+
+Exa queda habilitado globalmente: la configuración permite `websearch` y
+`skills-env.sh` exporta `OPENCODE_ENABLE_EXA=1`, lo que mantiene la herramienta
+disponible también con proveedores distintos de OpenCode. No necesita API key.
 
 ```bash
-# === EXA (web search) ===
-# NO necesita API key. El flag OPENCODE_ENABLE_EXA=1 ya lo activa contra
-# el MCP hosted de Exa AI sin autenticación. skills.sh ya lo exporta en
-# ~/.config/opencode/skills-env.sh, no tienes que hacer nada más.
-
 # === Context7 (docs de librerías) ===
 # Funciona SIN key (rate-limit modesto). Si quieres más rate-limit, crea
 # cuenta gratis en https://context7.com → Dashboard → genera una API key
@@ -591,6 +594,36 @@ export CONTEXT7_API_KEY=...
 # https://github.com/settings/tokens (scopes mínimos: repo, read:org, gist).
 export GITHUB_TOKEN=ghp_...
 ```
+
+## Activar Playwright MCP por proyecto (opcional)
+
+Playwright queda registrado globalmente con `"enabled": false`, por lo que sus
+23 herramientas no entran en el contexto normal. Para activarlo únicamente en
+un proyecto, añade a su `opencode.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "playwright": { "enabled": true }
+  }
+}
+```
+
+Reinicia OpenCode después de cambiar configuración.
+
+## Activar Ponytail por proyecto (opcional)
+
+Ponytail no se carga globalmente. En el proyecto donde quieras usarlo, añade:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@dietrichgebert/ponytail"]
+}
+```
+
+Así sus instrucciones y seis skills solo consumen contexto en ese proyecto.
 
 ## Activar el MCP de GitHub (opcional)
 
@@ -638,7 +671,8 @@ bash config/skills-smoke-test.sh
 ```
 
 Imprime OK/MISS por cada componente: imports Python, requires Node, binarios
-del sistema, presencia de los 17 skills, validez del `opencode.jsonc`, hook
+del sistema, presencia del conjunto reducido de skills, validez del
+`opencode.jsonc`, hook
 en el shell, `opencode-serve` activo y MCP de Context7 alcanzable.
 
 Exit code = número de fallos (0 si todo OK).

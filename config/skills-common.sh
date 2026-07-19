@@ -17,11 +17,17 @@ NODE_AISLADO="$HOME/.opencode-skills/node"
 SKILLS_ENV_FILE="$OPENCODE_CFG_DIR/skills-env.sh"
 DEST="$HOME/.config/opencode-dotfiles"  # donde provision.sh copia los scripts del systemd
 
-# Lista oficial de skills a instalar (las 17 del repo anthropics/skills).
+# Skills de uso frecuente instalados desde anthropics/skills.
 SKILLS=(
-    algorithmic-art brand-guidelines canvas-design claude-api doc-coauthoring
-    docx frontend-design internal-comms mcp-builder pdf pptx skill-creator
-    slack-gif-creator theme-factory web-artifacts-builder webapp-testing xlsx
+    claude-api doc-coauthoring docx frontend-design pdf skill-creator
+    webapp-testing
+)
+
+# Skills antes instalados por este repo que el perfil agresivo retira. Son
+# copias administradas de upstream; eliminarlos evita que sigan anunciandose.
+PRUNED_SKILLS=(
+    algorithmic-art brand-guidelines canvas-design internal-comms mcp-builder
+    pptx slack-gif-creator theme-factory web-artifacts-builder xlsx
 )
 
 # Helpers
@@ -115,7 +121,7 @@ else
     git -C "$CLONE_DIR" sparse-checkout set skills >/dev/null
 fi
 
-# Verificar que los 17 esten en el upstream
+# Verificar que los skills seleccionados esten en el upstream
 MISSING_UPSTREAM=()
 for s in "${SKILLS[@]}"; do
     [ -d "$CLONE_DIR/skills/$s" ] || MISSING_UPSTREAM+=("$s")
@@ -141,6 +147,14 @@ for s in "${SKILLS[@]}"; do
     fi
 done
 echo "  skills sincronizados: ${#SKILLS[@]}"
+
+for s in "${PRUNED_SKILLS[@]}"; do
+    DST="$SKILL_DIR/$s"
+    if [ -d "$DST" ]; then
+        rm -rf -- "$DST"
+        echo "  skill retirado: $s"
+    fi
+done
 
 # --- Step 3: venv Python --------------------------------------------------------
 log "Step 3 - venv Python aislado en $PYVENV"
@@ -201,10 +215,13 @@ export PATH="$VIRTUAL_ENV/bin:$PATH"
 # NODE_PATH actua como FALLBACK: Node busca primero en ./node_modules.
 # Se appendea para no pisar otros NODE_PATH preexistentes.
 export NODE_PATH="${NODE_PATH:+$NODE_PATH:}$HOME/.opencode-skills/node/node_modules"
-# Habilita la herramienta websearch (Exa). NO necesita API key:
-# la doc oficial dice "the tool connects directly to Exa AI's hosted MCP
-# service without authentication" (https://opencode.ai/docs/tools).
+# Mantiene Exa disponible tambien con proveedores distintos de OpenCode.
 export OPENCODE_ENABLE_EXA=1
+# Opciones locales adicionales no administradas por este repo.
+if [ -f "$HOME/.config/opencode/skills-env.local.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.config/opencode/skills-env.local.sh"
+fi
 ENV
 chmod 0644 "$SKILLS_ENV_FILE"
 
@@ -251,7 +268,8 @@ if [ -f "$CFG_FILE" ]; then
 fi
 # Ejecutar el merger usando el python del venv (donde json5 esta instalado).
 if ! "$PYVENV/bin/python" "$CONFIG_DIR/skills-merge-jsonc.py" \
-        "${CFG_FILE:-/dev/null}" "$TMPL" >"$TMP_OUT"; then
+        "${CFG_FILE:-/dev/null}" "$TMPL" \
+        --remove-plugin "@dietrichgebert/ponytail" >"$TMP_OUT"; then
     die "fallo el merge del opencode.jsonc; revisa $CFG_FILE manualmente. Backup en $BAK"
 fi
 # Validar resultado
@@ -319,5 +337,6 @@ echo " Tokens opcionales (exportalos en tu shell rc si los quieres):"
 echo "   CONTEXT7_API_KEY   - mayor rate-limit en docs (https://context7.com)"
 echo "   GITHUB_TOKEN       - GitHub MCP (descomenta tambien el bloque en"
 echo "                        $CFG_FILE)"
-echo " EXA (web search) ya esta activado: OPENCODE_ENABLE_EXA=1 funciona sin key."
+echo " Playwright MCP y Ponytail quedan desactivados hasta que un proyecto los habilite."
+echo " Exa/websearch queda habilitado globalmente."
 echo "============================================================"

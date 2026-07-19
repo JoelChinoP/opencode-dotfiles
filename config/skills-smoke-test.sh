@@ -51,15 +51,17 @@ echo ""
 echo "==> Skills clonados (~/.config/opencode/skills/)"
 if [ -d "$SKILLDIR" ]; then
     COUNT=$(find "$SKILLDIR" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
-    if [ "$COUNT" -ge 17 ]; then
+    if [ "$COUNT" -ge 7 ]; then
         ok "$COUNT skills"
     else
-        miss "skills count" "esperado >=17, hay $COUNT"
+        miss "skills count" "esperado >=7, hay $COUNT"
     fi
-    for s in algorithmic-art brand-guidelines canvas-design claude-api doc-coauthoring \
-             docx frontend-design internal-comms mcp-builder pdf pptx skill-creator \
-             slack-gif-creator theme-factory web-artifacts-builder webapp-testing xlsx; do
+    for s in claude-api doc-coauthoring docx frontend-design pdf skill-creator webapp-testing; do
         [ -f "$SKILLDIR/$s/SKILL.md" ] && ok "skill: $s" || miss "skill: $s" "SKILL.md ausente"
+    done
+    for s in algorithmic-art brand-guidelines canvas-design internal-comms mcp-builder \
+             pptx slack-gif-creator theme-factory web-artifacts-builder xlsx; do
+        [ ! -d "$SKILLDIR/$s" ] && ok "skill retirado: $s" || miss "skill: $s" "deberia estar retirado"
     done
 else
     miss "dir skills" "$SKILLDIR no existe"
@@ -74,6 +76,25 @@ if [ -f "$CFG" ]; then
     fi
     grep -q '"context7"' "$CFG" && ok "MCP context7 registrado" || miss "MCP context7" "no presente"
     grep -q '"playwright"' "$CFG" && ok "MCP playwright registrado" || miss "MCP playwright" "no presente"
+    "$PYBIN" - "$CFG" <<'PY' 2>/dev/null \
+        && ok "MCP playwright deshabilitado" \
+        || miss "MCP playwright" "debe tener enabled=false"
+import json5, pathlib, sys
+cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
+raise SystemExit(0 if cfg.get("mcp", {}).get("playwright", {}).get("enabled") is False else 1)
+PY
+    if grep -q '@dietrichgebert/ponytail' "$CFG"; then
+        miss "Ponytail opt-in" "sigue presente en la config global"
+    else
+        ok "Ponytail opt-in"
+    fi
+    "$PYBIN" - "$CFG" <<'PY' 2>/dev/null \
+        && ok "Exa/websearch habilitado" \
+        || miss "Exa/websearch" "debe tener permission.websearch=allow"
+import json5, pathlib, sys
+cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
+raise SystemExit(0 if cfg.get("permission", {}).get("websearch") == "allow" else 1)
+PY
     grep -q '"permission"' "$CFG" && ok "bloque permission" || miss "permission" "no presente"
 else
     miss "opencode.jsonc" "$CFG no existe"
@@ -87,6 +108,8 @@ fi
 
 if [ -f "$HOME/.config/opencode/skills-env.sh" ]; then
     ok "skills-env.sh"
+    grep -q '^export OPENCODE_ENABLE_EXA=1$' "$HOME/.config/opencode/skills-env.sh" \
+        && ok "OPENCODE_ENABLE_EXA=1" || miss "Exa env" "flag ausente"
 else
     miss "skills-env.sh" "no generado"
 fi
