@@ -46,8 +46,7 @@ sudo apt-get install -y --no-install-recommends \
 
 # Instalador de runtimes que skills-common.sh (Step 0) invoca si faltan node,
 # python, etc. Traduce tokens abstractos a paquetes apt. Node va via NodeSource
-# para garantizar 24+ (requisito de OpenCode Orchestrator 1.7.8; el de los
-# repos Debian suele ir por detras).
+# para garantizar 20+ (el de los repos Debian suele ir por detras).
 platform_install_runtimes() {
     local t pkgs=() want_node=0
     for t in "$@"; do
@@ -64,8 +63,8 @@ platform_install_runtimes() {
         sudo apt-get install -y --no-install-recommends "${pkgs[@]}"
     fi
     if [ "$want_node" -eq 1 ]; then
-        echo "==> Instalando Node 24 (NodeSource)"
-        curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+        echo "==> Instalando Node 22 LTS (NodeSource)"
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
         sudo apt-get install -y --no-install-recommends nodejs
     fi
 }

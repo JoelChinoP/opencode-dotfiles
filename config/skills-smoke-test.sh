@@ -12,7 +12,6 @@ PYBIN="$HOME/.venvs/opencode-skills/bin/python"
 NODEDIR="$HOME/.opencode-skills/node/node_modules"
 CFG="$HOME/.config/opencode/opencode.jsonc"
 SKILLDIR="$HOME/.config/opencode/skills"
-ORCHESTRATOR_PKG="$HOME/.cache/opencode/packages/opencode-orchestrator@1.7.8/node_modules/opencode-orchestrator/package.json"
 
 echo "==> Imports de Python (venv ~/.venvs/opencode-skills)"
 if [ ! -x "$PYBIN" ]; then
@@ -96,49 +95,9 @@ import json5, pathlib, sys
 cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
 raise SystemExit(0 if cfg.get("permission", {}).get("websearch") == "allow" else 1)
 PY
-    "$PYBIN" - "$CFG" <<'PY' 2>/dev/null \
-        && ok "Orchestrator 1.7.8 y perfiles por rol" \
-        || miss "OpenCode Orchestrator" "plugin, concurrencia o perfiles no coinciden"
-import json5, pathlib, sys
-cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
-
-expected_agents = {
-    "Commander": ("openai/gpt-5.6-sol", "high"),
-    "Planner": ("openai/gpt-5.6-terra", "high"),
-    "Worker": ("openai/gpt-5.6-terra", "medium"),
-    "Reviewer": ("openai/gpt-5.6-sol", "xhigh"),
-}
-for name, (model, effort) in expected_agents.items():
-    agent = cfg.get("agent", {}).get(name, {})
-    assert agent.get("model") == model
-    assert agent.get("reasoningEffort") == effort
-assert not ({"commander", "planner", "worker", "reviewer"} & set(cfg.get("agent", {})))
-
-entry = next(
-    item for item in cfg.get("plugin", [])
-    if isinstance(item, list) and item and item[0] == "opencode-orchestrator@1.7.8"
-)
-options = entry[1]
-assert options["agentConcurrency"] == {
-    "commander": 1, "planner": 1, "worker": 4, "reviewer": 1
-}
-assert options["missionLoop"] == {
-    "ledger": True, "markdownMemory": True, "maxEvidenceEvents": 20
-}
-assert cfg.get("permission", {}).get("question") == "allow"
-PY
     grep -q '"permission"' "$CFG" && ok "bloque permission" || miss "permission" "no presente"
 else
     miss "opencode.jsonc" "$CFG no existe"
-fi
-
-if [ -f "$ORCHESTRATOR_PKG" ]; then
-    ORCHESTRATOR_VERSION=$(node -p "require('$ORCHESTRATOR_PKG').version" 2>/dev/null || true)
-    [ "$ORCHESTRATOR_VERSION" = "1.7.8" ] \
-        && ok "paquete Orchestrator 1.7.8 en cache" \
-        || miss "paquete Orchestrator" "version inesperada: ${ORCHESTRATOR_VERSION:-?}"
-else
-    miss "paquete Orchestrator" "aun no descargado; reinicia OpenCode"
 fi
 
 if [ -f "$HOME/.config/opencode/AGENTS.md" ]; then
