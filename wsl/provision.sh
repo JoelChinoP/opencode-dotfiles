@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # provision.sh - se ejecuta DENTRO de Debian (WSL).
-# Instala paquetes, OpenCode, aplica la config de git pedida, levanta el
-# reverse proxy elegido (nginx o Caddy) apuntando al API de 'opencode-serve'
-# (:4096), que TAMBIEN sirve la web UI en /app. Asi un solo proceso atiende
-# al navegador (via proxy), a la app de escritorio (via mirrored networking)
-# y a los SDK/plugins IDE.
+# Instala paquetes, OpenCode, aplica la config de git pedida y levanta
+# 'opencode-serve' (API + web UI en /app) limitado a localhost. Con la red
+# mirrored de WSL, Windows tambien lo alcanza mediante localhost.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,7 +11,6 @@ source "$DIR/dotfiles.env"
 
 : "${OPENCODE_WORKDIR:=/home/joel}"
 : "${OPENCODE_SERVE_PORT:=4096}"
-: "${OPENCODE_DOMAIN:=opencode.local}"
 : "${OPENCODE_SERVER_PASSWORD:=}"
 
 USER_NAME="$(id -un)"
@@ -24,7 +21,7 @@ else
     WORKDIR="$USER_HOME/$OPENCODE_WORKDIR"
 fi
 
-echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  API=$OPENCODE_SERVE_PORT  Dominio=$OPENCODE_DOMAIN"
+echo "==> Usuario=$USER_NAME  Workdir=$WORKDIR  API=$OPENCODE_SERVE_PORT"
 
 # --- Aviso si systemd no esta activo (deberia estarlo tras 01-setup-wsl.ps1) ---
 if [ "$(ps -p 1 -o comm= 2>/dev/null)" != "systemd" ]; then
@@ -59,55 +56,9 @@ git config --global core.eol lf
 # --- 4) Carpeta de trabajo (filesystem nativo, rapido) ---
 mkdir -p "$WORKDIR"
 
-# --- 5) /etc/hosts dentro de WSL: dominio -> 127.0.0.1 ---
-if ! grep -q -- "$OPENCODE_DOMAIN" /etc/hosts; then
-    echo "127.0.0.1 $OPENCODE_DOMAIN" | sudo tee -a /etc/hosts >/dev/null
-    echo "==> /etc/hosts: anadido 127.0.0.1 $OPENCODE_DOMAIN"
-fi
-
-# Sustituye los marcadores __PORT__ / __DOMAIN__ de las plantillas. El proxy
-# apunta al puerto del API (opencode-serve), que tambien sirve la web en /app.
-render() { sed -e "s|__PORT__|${OPENCODE_SERVE_PORT}|g" -e "s|__DOMAIN__|${OPENCODE_DOMAIN}|g" "$1"; }
-
-# --- 6) Reverse proxy: lo decide el usuario (nginx http / Caddy https), no ambos ---
-echo ""
-echo "Reverse proxy para ${OPENCODE_DOMAIN}:"
-echo "  [N] nginx -> http://${OPENCODE_DOMAIN}    (sin TLS, ligero, por defecto)"
-echo "  [C] Caddy -> https://${OPENCODE_DOMAIN}   (TLS local automatico)"
-read -r -p "Elige N/C [N]: " PROXY_CHOICE || true
-PROXY_CHOICE="${PROXY_CHOICE:-N}"
-
-if [[ "$PROXY_CHOICE" =~ ^[Cc] ]]; then
-    echo "==> Instalando Caddy (y desactivando nginx si estaba)"
-    sudo systemctl disable --now nginx 2>/dev/null || true
-    sudo apt-get install -y --no-install-recommends debian-keyring debian-archive-keyring apt-transport-https gnupg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-        | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-        | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-    sudo apt-get update -y
-    sudo apt-get install -y --no-install-recommends caddy
-    render "$DIR/Caddyfile" | sudo tee /etc/caddy/Caddyfile >/dev/null
-    sudo systemctl enable --now caddy
-    sudo systemctl restart caddy
-    PROXY_NAME="caddy"; SCHEME="https"
-else
-    echo "==> Instalando nginx (y desactivando Caddy si estaba)"
-    sudo systemctl disable --now caddy 2>/dev/null || true
-    sudo apt-get install -y --no-install-recommends nginx
-    sudo cp -f "$DIR/nginx-opencode-map.conf" /etc/nginx/conf.d/opencode-map.conf
-    render "$DIR/nginx-opencode.conf" | sudo tee /etc/nginx/sites-available/opencode >/dev/null
-    sudo ln -sf /etc/nginx/sites-available/opencode /etc/nginx/sites-enabled/opencode
-    sudo rm -f /etc/nginx/sites-enabled/default
-    sudo nginx -t
-    sudo systemctl enable --now nginx
-    sudo systemctl restart nginx
-    PROXY_NAME="nginx"; SCHEME="http"
-fi
-
-# --- 7) Servicio systemd: opencode serve (API + web UI en /app) ---
-# Un unico proceso atiende: navegador (via proxy + /app), app de escritorio
-# (via mirrored networking) y SDK/plugins IDE. No hace falta levantar
+# --- 5) Servicio systemd: opencode serve (API + web UI en /app) ---
+# Un unico proceso atiende el navegador, la app de escritorio y los SDK/plugins
+# IDE mediante localhost y mirrored networking. No hace falta levantar
 # 'opencode web' aparte. WorkingDirectory esta fijado a ${WORKDIR}.
 echo "==> Creando servicio systemd 'opencode-serve' (API + web UI)"
 sudo tee /etc/systemd/system/opencode-serve.service >/dev/null <<EOF
@@ -143,14 +94,8 @@ echo ""
 echo "============================================================"
 echo " Provision completado."
 echo "   Server permanente: 127.0.0.1:${OPENCODE_SERVE_PORT}  (API + web UI en /app)"
-echo "   Navegador (Win):   ${SCHEME}://${OPENCODE_DOMAIN}/app    (proxy -> :${OPENCODE_SERVE_PORT})"
-echo "                      o directo: http://localhost:${OPENCODE_SERVE_PORT}/app  (via mirrored)"
+echo "   Navegador (Win):   http://localhost:${OPENCODE_SERVE_PORT}/app  (via mirrored)"
 echo "   App de escritorio: apuntala a  http://localhost:${OPENCODE_SERVE_PORT}"
 echo "   Workspace:         ${WORKDIR}  (lo fija el WorkingDirectory del systemd)"
-echo "   Servicios:         systemctl status opencode-serve ${PROXY_NAME}"
-if [ "$SCHEME" = "https" ]; then
-    echo ""
-    echo " NOTA Caddy/HTTPS: para que el navegador de Windows confie en el"
-    echo " certificado, importa la CA local de Caddy (ver README)."
-fi
+echo "   Servicio:          systemctl status opencode-serve"
 echo "============================================================"
