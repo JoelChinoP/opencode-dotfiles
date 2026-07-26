@@ -5,6 +5,10 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -r "$DIR/defaults.env" ]]; then
+    # shellcheck disable=SC1091
+    source "$DIR/defaults.env"
+fi
 # shellcheck disable=SC1090
 source "$DIR/dotfiles.env"
 
@@ -19,7 +23,7 @@ fi
 : "${OPENCODE_WORKDIR:=/home/joel}"
 : "${OPENCODE_SERVE_PORT:=4096}"
 
-export PATH="$HOME/.opencode/bin:$HOME/.local/bin:/usr/bin:$PATH"
+export PATH="$HOME/.local/bin:/usr/bin:$PATH"
 
 if [[ "$OPENCODE_WORKDIR" = /* ]]; then
     WORKDIR="$OPENCODE_WORKDIR"
@@ -31,4 +35,4 @@ cd "$WORKDIR"
 
 export OPENCODE_SERVER_PASSWORD="${OPENCODE_SERVER_PASSWORD:-}"
 
-exec opencode serve --hostname 127.0.0.1 --port "$OPENCODE_SERVE_PORT"
+exec /usr/bin/opencode serve --hostname 127.0.0.1 --port "$OPENCODE_SERVE_PORT"

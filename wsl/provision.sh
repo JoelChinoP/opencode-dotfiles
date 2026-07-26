@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # provision.sh - se ejecuta DENTRO de Debian (WSL).
 # Instala paquetes, OpenCode, aplica la config de git pedida y levanta
-# 'opencode-serve' (API + web UI en /app) limitado a localhost. Con la red
+# 'opencode-serve' (API + web UI) limitado a localhost. Con la red
 # mirrored de WSL, Windows tambien lo alcanza mediante localhost.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -r "$DIR/defaults.env" ]; then
+    # shellcheck disable=SC1091
+    source "$DIR/defaults.env"
+fi
 # shellcheck disable=SC1090
 source "$DIR/dotfiles.env"
 
 : "${OPENCODE_WORKDIR:=/home/joel}"
 : "${OPENCODE_SERVE_PORT:=4096}"
-: "${OPENCODE_SERVER_PASSWORD:=}"
 
 USER_NAME="$(id -un)"
 USER_HOME="$HOME"
@@ -56,7 +59,7 @@ git config --global core.eol lf
 # --- 4) Carpeta de trabajo (filesystem nativo, rapido) ---
 mkdir -p "$WORKDIR"
 
-# --- 5) Servicio systemd: opencode serve (API + web UI en /app) ---
+# --- 5) Servicio systemd: opencode serve (API + web UI) ---
 # Un unico proceso atiende el navegador, la app de escritorio y los SDK/plugins
 # IDE mediante localhost y mirrored networking. No hace falta levantar
 # 'opencode web' aparte. WorkingDirectory esta fijado a ${WORKDIR}.
@@ -72,8 +75,6 @@ Type=simple
 User=${USER_NAME}
 WorkingDirectory=${WORKDIR}
 Environment=HOME=${USER_HOME}
-Environment=OPENCODE_SERVE_PORT=${OPENCODE_SERVE_PORT}
-Environment=OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
 ExecStart=${DIR}/opencode-serve.sh
 Restart=on-failure
 RestartSec=3
@@ -93,8 +94,8 @@ sudo systemctl restart opencode-serve.service
 echo ""
 echo "============================================================"
 echo " Provision completado."
-echo "   Server permanente: 127.0.0.1:${OPENCODE_SERVE_PORT}  (API + web UI en /app)"
-echo "   Navegador (Win):   http://localhost:${OPENCODE_SERVE_PORT}/app  (via mirrored)"
+echo "   Server permanente: 127.0.0.1:${OPENCODE_SERVE_PORT}  (API + web UI)"
+echo "   Navegador (Win):   http://localhost:${OPENCODE_SERVE_PORT}/  (via mirrored)"
 echo "   App de escritorio: apuntala a  http://localhost:${OPENCODE_SERVE_PORT}"
 echo "   Workspace:         ${WORKDIR}  (lo fija el WorkingDirectory del systemd)"
 echo "   Servicio:          systemctl status opencode-serve"

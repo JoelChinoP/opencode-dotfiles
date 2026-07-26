@@ -5,7 +5,7 @@
 . "$PSScriptRoot\common.ps1"
 
 $repo      = Get-RepoRoot
-$cfg       = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
+$cfg       = Read-OpenCodeConfig
 $servePort = $cfg['OPENCODE_SERVE_PORT']
 
 Write-Step "4/4 - App de escritorio de OpenCode"

@@ -56,7 +56,18 @@ require_var PLATFORM
 
 # Cargar dotfiles.env
 # shellcheck disable=SC1091
-source "$CONFIG_DIR/dotfiles.env"
+if [ -f "$DEST/defaults.env" ]; then
+    source "$DEST/defaults.env"
+else
+    source <(sed 's/\r$//' "$CONFIG_DIR/dotfiles.env")
+fi
+if [ -f "$DEST/dotfiles.env" ]; then
+    # shellcheck disable=SC1091
+    source "$DEST/dotfiles.env"
+elif [ -f "$REPO_DIR/dotfiles.env" ]; then
+    # shellcheck disable=SC1091
+    source <(sed 's/\r$//' "$REPO_DIR/dotfiles.env")
+fi
 : "${SKILLS_REPO:=https://github.com/anthropics/skills}"
 : "${SKILLS_REF:=main}"
 

@@ -5,6 +5,10 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -r "$DIR/defaults.env" ]; then
+    # shellcheck disable=SC1091
+    source "$DIR/defaults.env"
+fi
 # shellcheck disable=SC1090
 source "$DIR/dotfiles.env"
 
@@ -30,8 +34,8 @@ fi
 
 cd "$WORKDIR"
 
-# Basic Auth opcional (vacio = sin auth). Usuario por defecto del server: 'opencode'.
-export OPENCODE_SERVER_PASSWORD="${OPENCODE_SERVER_PASSWORD:-}"
+# WSL solo se publica por localhost/mirrored networking y siempre queda sin auth.
+unset OPENCODE_SERVER_PASSWORD
 
 # Escucha SOLO en localhost. Con networkingMode=mirrored, la app de escritorio
 # de Windows alcanza este puerto via http://localhost:OPENCODE_SERVE_PORT.

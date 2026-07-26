@@ -11,6 +11,25 @@ function Get-RepoRoot {
     return (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 }
 
+function Get-DotEnvPath {
+    $repo = Get-RepoRoot
+    $private = Join-Path $repo 'dotfiles.env'
+    if (Test-Path -LiteralPath $private) { return $private }
+    return (Join-Path $repo 'config\dotfiles.env')
+}
+
+function Read-OpenCodeConfig {
+    $repo = Get-RepoRoot
+    $cfg = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
+    $private = Join-Path $repo 'dotfiles.env'
+    if (Test-Path -LiteralPath $private) {
+        foreach ($entry in (Read-DotEnv $private).GetEnumerator()) {
+            $cfg[$entry.Key] = $entry.Value
+        }
+    }
+    return $cfg
+}
+
 function Read-DotEnv {
     param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) {

@@ -6,7 +6,7 @@
 Assert-Admin
 
 $repo    = Get-RepoRoot
-$cfg     = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
+$cfg     = Read-OpenCodeConfig
 $distro  = $cfg['WSL_DISTRO']
 
 Write-Step "1/3 - Configurando WSL2 + $distro"

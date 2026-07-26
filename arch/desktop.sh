@@ -20,14 +20,22 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 
 # --- Cargar configuracion ---
-# Preferimos la copia que dejo el provision en ~/.config/opencode-dotfiles/
-# Si no existe (corriste desktop.sh antes que provision), caemos al repo.
-if [ -f "$HOME/.config/opencode-dotfiles/dotfiles.env" ]; then
+# Preferir exactamente el par normalizado que usa el servicio desplegado.
+DEPLOYED="$HOME/.config/opencode-dotfiles"
+if [ -f "$DEPLOYED/defaults.env" ]; then
     # shellcheck disable=SC1091
-    source "$HOME/.config/opencode-dotfiles/dotfiles.env"
+    source "$DEPLOYED/defaults.env"
+    if [ -f "$DEPLOYED/dotfiles.env" ]; then
+        # shellcheck disable=SC1091
+        source "$DEPLOYED/dotfiles.env"
+    fi
 else
     # shellcheck disable=SC1091
-    source "$REPO/config/dotfiles.env"
+    source <(sed 's/\r$//' "$REPO/config/dotfiles.env")
+    if [ -f "$REPO/dotfiles.env" ]; then
+        # shellcheck disable=SC1091
+        source <(sed 's/\r$//' "$REPO/dotfiles.env")
+    fi
 fi
 : "${OPENCODE_SERVE_PORT:=4096}"
 

@@ -5,7 +5,7 @@
 . "$PSScriptRoot\common.ps1"
 
 $repo    = Get-RepoRoot
-$cfg     = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
+$cfg     = Read-OpenCodeConfig
 $distro  = $cfg['WSL_DISTRO']
 $workdir = $cfg['OPENCODE_WORKDIR']
 

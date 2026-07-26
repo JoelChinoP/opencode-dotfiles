@@ -4,7 +4,7 @@ Instalación y configuración automatizada de **OpenCode** en **Windows**
 mediante **WSL2 + Debian** y en **Arch Linux** nativo.
 
 El setup base ejecuta un único <code>opencode serve</code> como servicio
-<code>systemd</code>. Este proceso expone el API y la web UI en <code>/app</code>,
+<code>systemd</code>. Este proceso expone el API y la web UI en la raíz,
 ambos limitados a <code>127.0.0.1:4096</code>. El navegador, la app de escritorio
 y los SDK se conectan directamente a ese servicio.
 
@@ -29,7 +29,7 @@ y los SDK se conectan directamente a ese servicio.
 7. Crea los comandos <code>opencode</code> y <code>oc</code> para Windows.
 8. Opcionalmente instala la app de escritorio mediante Scoop.
 
-La web queda disponible en <code>http://localhost:4096/app</code>. La red
+La web queda disponible en <code>http://localhost:4096/</code>. La red
 mirrored de WSL permite que el <code>localhost</code> de Windows llegue
 directamente al servicio de Debian.
 
@@ -62,8 +62,9 @@ vuelve a ejecutar <code>install.ps1</code>.
 
 ~~~text
 opencode-dotfiles/
+├─ dotfiles.env              # configuracion privada, ignorada por Git
 ├─ config/
-│  └─ dotfiles.env
+│  └─ dotfiles.env           # plantilla versionada
 ├─ windows/
 │  ├─ .wslconfig
 │  ├─ install.ps1
@@ -85,14 +86,25 @@ opencode-dotfiles/
 
 ## Configuración central
 
-Edita <code>config/dotfiles.env</code> antes de instalar:
+<code>config/dotfiles.env</code> es la plantilla versionada. Crea la copia
+privada en la raíz del repositorio y edita esa copia:
+
+```powershell
+Copy-Item .\config\dotfiles.env .\dotfiles.env
+notepad .\dotfiles.env
+```
+
+Los instaladores prefieren <code>dotfiles.env</code>. Arch lo exige y despliega
+una copia con modo <code>0600</code>; Windows/WSL conserva la plantilla como
+fallback para instalaciones limitadas a localhost. La copia privada puede
+contener toda la plantilla o solamente las claves que quieras sobrescribir.
 
 | Clave | Valor inicial | Uso |
 |---|---:|---|
 | <code>WSL_DISTRO</code> | <code>Debian</code> | Distribución WSL que se instala o reutiliza. |
 | <code>OPENCODE_WORKDIR</code> | <code>.config/opencode</code> | Directorio de trabajo del servicio; una ruta relativa parte de <code>$HOME</code>. |
 | <code>OPENCODE_SERVE_PORT</code> | <code>4096</code> | Puerto local del API y la web UI. |
-| <code>OPENCODE_SERVER_PASSWORD</code> | vacío | Basic Auth opcional; el usuario predeterminado es <code>opencode</code>. |
+| <code>OPENCODE_SERVER_PASSWORD</code> | vacío | Basic Auth opcional en Arch; WSL siempre lo ignora. El usuario predeterminado es <code>opencode</code>. |
 | <code>SKILLS_REPO</code> | repositorio oficial | Origen de los skills opcionales. |
 | <code>SKILLS_REF</code> | <code>main</code> | Rama, tag o commit de los skills. |
 
@@ -134,7 +146,7 @@ oc opencode upgrade
 - <code>opencode</code> abre el TUI dentro de Debian.
 - <code>oc</code> abre una shell de Debian.
 - <code>oc &lt;comando&gt;</code> ejecuta un comando en Debian.
-- La web se abre en <code>http://localhost:4096/app</code>.
+- La web se abre en <code>http://localhost:4096/</code>.
 - El API para la app y los SDK está en <code>http://localhost:4096</code>.
 
 Para máximo rendimiento, conserva los repositorios dentro del filesystem Linux
@@ -207,19 +219,27 @@ filesystem Linux.
 
 ## Qué hace
 
-1. Instala OpenCode desde AUR mediante <code>paru</code> o <code>yay</code>; si
-   no están disponibles, usa el paquete del repositorio oficial.
+1. Instala OpenCode desde el paquete oficial <code>extra/opencode</code>; usa
+   <code>opencode-bin</code> de AUR solo si el paquete oficial no existe.
 2. Instala <code>wl-clipboard</code>, <code>xclip</code> o ambos según la sesión
    gráfica.
 3. Crea <code>opencode-serve</code> como servicio <code>systemd</code> en
-   <code>127.0.0.1:4096</code>.
+   <code>127.0.0.1:4096</code>, con Basic Auth opcional y ejecutando explícitamente
+   <code>/usr/bin/opencode</code>.
 4. Opcionalmente instala la app de escritorio nativa.
+
+Este repositorio es el único dueño de la instalación y el servicio de
+OpenCode. El repositorio <code>/home/dotfiles</code> solo administra Tailscale y
+su ciclo de acceso remoto.
 
 ## Instalación
 
 ~~~bash
 git clone <url-de-este-repo> ~/opencode-dotfiles
 cd ~/opencode-dotfiles
+cp config/dotfiles.env dotfiles.env
+chmod 600 dotfiles.env
+${EDITOR:-nano} dotfiles.env
 bash arch/install.sh
 ~~~
 
@@ -233,15 +253,20 @@ opencode
 opencode auth login
 systemctl status opencode-serve
 journalctl -u opencode-serve -e
-opencode upgrade
+sudo pacman -Syu
 ~~~
 
-- Web UI: <code>http://localhost:4096/app</code>
+- Web UI: <code>http://localhost:4096/</code>
 - API y app de escritorio: <code>http://127.0.0.1:4096</code>
 
 El <code>WorkingDirectory</code> del servicio se toma de
 <code>OPENCODE_WORKDIR</code>. El TUI se puede abrir desde cualquier proyecto y
 trabaja en el directorio actual.
+
+<code>opencode-desktop-bin</code> es la aplicación gráfica opcional, no una
+segunda instalación del CLI. Normalmente <code>/usr/bin/opencode</code>
+pertenece al paquete oficial <code>opencode</code> y se actualiza con el sistema;
+solo si ese paquete no existe se usa el fallback <code>opencode-bin</code>.
 
 ## App de escritorio en Arch
 

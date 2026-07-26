@@ -52,11 +52,11 @@ if (-not $SkipDesktop) {
     else { Write-Note "App de escritorio omitida." }
 }
 
-$cfg = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
+$cfg = Read-OpenCodeConfig
 Write-Step "Instalacion completada"
 Write-Host "  1) Abre una terminal NUEVA (para que tome el PATH)." -ForegroundColor Green
 Write-Host "  2) Ejecuta:  opencode        (abre el TUI dentro de Debian)" -ForegroundColor Green
-Write-Host "  3) Navegador:  http://localhost:$($cfg['OPENCODE_SERVE_PORT'])/app" -ForegroundColor Green
+Write-Host "  3) Navegador:  http://localhost:$($cfg['OPENCODE_SERVE_PORT'])/" -ForegroundColor Green
 Write-Host "  4) App de escritorio:  conecta a http://localhost:$($cfg['OPENCODE_SERVE_PORT'])" -ForegroundColor Green
 Write-Host ""
 Read-Host "Pulsa Enter para cerrar esta ventana"

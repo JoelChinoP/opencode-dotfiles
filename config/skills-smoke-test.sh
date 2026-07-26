@@ -159,8 +159,37 @@ echo ""
 echo "==> opencode-serve y MCP alcanzable"
 systemctl is-active opencode-serve >/dev/null 2>&1 \
     && ok "opencode-serve activo" || miss "opencode-serve" "inactivo"
-curl -fsS http://127.0.0.1:4096/ -o /dev/null 2>/dev/null \
-    && ok "API local responde" || miss "API local" "no responde en :4096"
+if [ -f "$HOME/.config/opencode-dotfiles/defaults.env" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.config/opencode-dotfiles/defaults.env"
+fi
+if [ -f "$HOME/.config/opencode-dotfiles/dotfiles.env" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.config/opencode-dotfiles/dotfiles.env"
+fi
+: "${OPENCODE_SERVE_PORT:=4096}"
+HEALTH_URL="http://127.0.0.1:${OPENCODE_SERVE_PORT}/global/health"
+AUTH_CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTH_URL" 2>/dev/null || true)
+if [ "$AUTH_CODE" = 401 ]; then
+    if [ -z "${OPENCODE_SERVER_PASSWORD:-}" ]; then
+        miss "API local" "exige Basic Auth pero no hay password desplegado"
+    else
+        ok "API local exige Basic Auth"
+    fi
+    CURL_PASSWORD=${OPENCODE_SERVER_PASSWORD//\\/\\\\}
+    CURL_PASSWORD=${CURL_PASSWORD//\"/\\\"}
+    printf 'user = "opencode:%s"\n' "$CURL_PASSWORD" \
+        | curl -fsS --config - "$HEALTH_URL" -o /dev/null 2>/dev/null \
+        && ok "API local acepta credenciales" || miss "API local" "credenciales ausentes o invalidas"
+elif [[ "$AUTH_CODE" =~ ^2[0-9][0-9]$ ]]; then
+    if [ -n "${OPENCODE_SERVER_PASSWORD:-}" ]; then
+        miss "API local" "hay password configurado pero el servidor responde sin autenticacion"
+    else
+        ok "API local responde sin autenticacion"
+    fi
+else
+    miss "API local" "no responde en :${OPENCODE_SERVE_PORT}"
+fi
 curl -fsS -o /dev/null --max-time 5 https://mcp.context7.com/ping 2>/dev/null \
     && ok "context7 alcanzable" || miss "context7" "no responde (red?)"
 

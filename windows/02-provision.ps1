@@ -4,7 +4,9 @@
 . "$PSScriptRoot\common.ps1"
 
 $repo   = Get-RepoRoot
-$cfg    = Read-DotEnv (Join-Path $repo 'config\dotfiles.env')
+$envPath = Get-DotEnvPath
+$templatePath = Join-Path $repo 'config\dotfiles.env'
+$cfg    = Read-OpenCodeConfig
 $distro = $cfg['WSL_DISTRO']
 
 Write-Step "2/3 - Aprovisionando $distro (paquetes, opencode, git y servicio)"
@@ -14,6 +16,8 @@ if (-not (Test-WslDistro -Distro $distro)) {
 }
 
 $repoWsl = ConvertTo-WslPath -WinPath $repo -Distro $distro
+$envWsl = ConvertTo-WslPath -WinPath $envPath -Distro $distro
+$templateWsl = ConvertTo-WslPath -WinPath $templatePath -Distro $distro
 Write-Ok "Repo visible en WSL como: $repoWsl"
 
 # Comando bash: copiar -> normalizar CRLF -> dar permisos -> ejecutar provision.sh
@@ -22,8 +26,14 @@ $bash = @"
 set -e
 DEST="`$HOME/.config/opencode-dotfiles"
 mkdir -p "`$DEST"
-cp -f "$repoWsl/config/dotfiles.env" "`$DEST/"
+if [ -f "`$DEST/expose-opencode-lan-session.sh" ]; then
+    bash "`$DEST/expose-opencode-lan-session.sh" stop || true
+fi
+install -m 0644 "$templateWsl" "`$DEST/defaults.env"
+install -m 0600 "$envWsl" "`$DEST/dotfiles.env"
+sed -i '/OPENCODE_SERVER_PASSWORD/d' "`$DEST/dotfiles.env"
 cp -f "$repoWsl/wsl/"*.sh   "`$DEST/" 2>/dev/null || true
+rm -f "`$DEST/expose-opencode-lan-session.sh"
 find "`$DEST" -type f -exec sed -i 's/\r`$//' {} +
 chmod +x "`$DEST/"*.sh
 bash "`$DEST/provision.sh"
