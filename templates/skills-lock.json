@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "id": "document-files",
+      "source": { "type": "local" },
+      "content_sha256": "9bdecb125dfebd37853f7daa95952db36db0212b404eb0334cefefb5deb0b96c",
+      "runtime": {
+        "type": "system",
+        "required_commands": ["pandoc", "libreoffice", "pdfinfo", "pdftotext", "pdftoppm"],
+        "optional_commands": ["qpdf", "tesseract"]
+      },
+      "autoinvoke": true
+    },
+    {
+      "id": "frontend-design",
+      "source": {
+        "type": "github",
+        "repository": "anthropics/skills",
+        "commit": "34040c9c568585f6929bedeaad110ad08f079624",
+        "path": "skills/frontend-design"
+      },
+      "license": "Apache-2.0",
+      "content_sha256": "4d60d6583c57672238c752dce692ca53e9213f433c76943c3146798006f631ac",
+      "runtime": { "type": "none" },
+      "autoinvoke": true
+    },
+    {
+      "id": "playwright-cli",
+      "source": {
+        "type": "github",
+        "repository": "microsoft/playwright-cli",
+        "commit": "74354ecc7a43da16d91a9bc54fa8db8283a3fcf5",
+        "path": "skills/playwright-cli",
+        "locally_modified": true
+      },
+      "license": "Apache-2.0",
+      "content_sha256": "c3173cd5cb3df3c337fbdfd4344d506e9ffe57367bb4516143f7176351e18fa2",
+      "runtime": {
+        "type": "node-tool",
+        "package": "@playwright/cli",
+        "version": "0.1.21",
+        "integrity": "sha512-FfxmVJj2wJlsxPksUO+4N7gqimPEQPajpocl2Mk97ENIGfAVZ4aElzPb5sDdGXHI9J/3Y8EtUiUTas0VsTm/sg==",
+        "browser": "system-chromium",
+        "required_commands": ["node", "npm", "chromium"]
+      },
+      "autoinvoke": true
+    },
+    {
+      "id": "skill-governance",
+      "source": { "type": "local" },
+      "content_sha256": "163b64b622bb6e43d9b5851509d1f9f556800b2c8d036382f67743215e51f6c8",
+      "runtime": { "type": "python-stdlib" },
+      "autoinvoke": false
+    }
+  ]
+}

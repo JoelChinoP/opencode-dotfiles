@@ -1,0 +1,123 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "build",
+  "update": "notify",
+  "agents": {
+    "title": {
+      "model": "opencode/big-pickle"
+    }
+  },
+  "compaction": {
+    "auto": true,
+    "keep": {
+      "tokens": 30000
+    },
+    "buffer": 20000
+  },
+  "providers": {
+    "openai": {
+      "models": {
+        "gpt-6-astra": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
+        "gpt-5.6-sol": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
+        "gpt-5.6-terra": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
+        "gpt-5.6-terra-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
+        "gpt-5.6-luna": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
+        "gpt-5.6-luna-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } }
+      }
+    }
+  },
+  "tool_output": {
+    "max_lines": 1000,
+    "max_bytes": 32768
+  },
+  "skills": [
+    "~/.config/opencode/skills"
+  ],
+  "plugins": [
+    {
+      "package": "./plugins/ponytail",
+      "options": {
+        "defaultMode": "lite"
+      }
+    },
+    "./plugins/engram"
+  ],
+  "mcp": {
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        "disabled": false
+      },
+      "engram": {
+        "type": "local",
+        "command": [
+          "engram",
+          "mcp",
+          "--tools=agent"
+        ],
+        "disabled": false
+      },
+      "codegraph": {
+        "type": "remote",
+        "url": "https://api.codegraph.ru/agent-plugin/mcp",
+        "disabled": true
+      }
+    }
+  },
+  "permissions": [
+    { "action": "shell", "resource": "*", "effect": "ask" },
+    { "action": "shell", "resource": "pwd", "effect": "allow" },
+    { "action": "shell", "resource": "git status *", "effect": "allow" },
+    { "action": "shell", "resource": "git ls-files", "effect": "allow" },
+    { "action": "shell", "resource": "git diff --no-ext-diff --no-textconv", "effect": "allow" },
+    { "action": "shell", "resource": "git diff --no-ext-diff --no-textconv --stat", "effect": "allow" },
+    { "action": "shell", "resource": "git log -5 --oneline", "effect": "allow" },
+    { "action": "shell", "resource": "sudo *", "effect": "deny" },
+    { "action": "subagent", "resource": "*", "effect": "ask" },
+    { "action": "skill", "resource": "*", "effect": "deny" },
+    { "action": "skill", "resource": "opencode", "effect": "allow" },
+    { "action": "skill", "resource": "report", "effect": "allow" },
+    { "action": "skill", "resource": "document-files", "effect": "allow" },
+    { "action": "skill", "resource": "frontend-design", "effect": "allow" },
+    { "action": "skill", "resource": "playwright-cli", "effect": "allow" },
+    { "action": "skill", "resource": "skill-governance", "effect": "allow" },
+    { "action": "read", "resource": "~/.ssh/*", "effect": "deny" },
+    { "action": "edit", "resource": "~/.ssh/*", "effect": "deny" },
+    { "action": "read", "resource": "*.pem", "effect": "ask" },
+    { "action": "read", "resource": "*.key", "effect": "ask" },
+    { "action": "read", "resource": "node_modules/*", "effect": "ask" },
+    { "action": "read", "resource": "*/node_modules/*", "effect": "ask" },
+    { "action": "read", "resource": ".venv/*", "effect": "ask" },
+    { "action": "read", "resource": "*/.venv/*", "effect": "ask" },
+    { "action": "read", "resource": "venv/*", "effect": "ask" },
+    { "action": "read", "resource": "*/venv/*", "effect": "ask" },
+    { "action": "read", "resource": "vendor/*", "effect": "ask" },
+    { "action": "read", "resource": "*/vendor/*", "effect": "ask" },
+    { "action": "read", "resource": "dist/*", "effect": "ask" },
+    { "action": "read", "resource": "*/dist/*", "effect": "ask" },
+    { "action": "read", "resource": "build/*", "effect": "ask" },
+    { "action": "read", "resource": "*/build/*", "effect": "ask" },
+    { "action": "read", "resource": "coverage/*", "effect": "ask" },
+    { "action": "read", "resource": "*/coverage/*", "effect": "ask" },
+    { "action": "read", "resource": ".next/*", "effect": "ask" },
+    { "action": "read", "resource": "*/.next/*", "effect": "ask" },
+    { "action": "read", "resource": ".git/*", "effect": "ask" },
+    { "action": "read", "resource": "*/.git/*", "effect": "ask" },
+    {
+      "action": "engram_mem_*",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "engram_mem_save_prompt",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "engram_mem_capture_passive",
+      "resource": "*",
+      "effect": "deny"
+    }
+  ]
+}

@@ -1,198 +1,79 @@
-# opencode-dotfiles
+# opencode-dotfiles-v2
 
-Instalacion reproducible de OpenCode para Arch Linux y Windows 11 con
-WSL2/Debian. Configura un unico `opencode serve` en `127.0.0.1:4096` y, de
-forma opcional, instala skills, MCP y herramientas de documentos.
+Perfil limpio de **OpenCode V2 para Arch Linux**, con Engram, Ponytail y la
+statusline como plugins locales. Versiones de referencia: OpenCode 2.0.8 y
+Engram 2.0.0.
 
-## Configuracion Base
+| Integración | Estado |
+| --- | --- |
+| Context7 MCP remoto | Activado; documentación solo cuando hace falta |
+| Engram MCP local | Activado; memoria crítica y contexto limitado |
+| CodeGraph MCP remoto | Desactivado por defecto |
+| Engram local V2 | Política crítica y guía de compactación |
+| Ponytail local V2 | Reglas por turno en `lite`; `/ponytail` cambia el modo |
+| subagent-statusline.v2 local | Pie y barra lateral de la TUI |
+| Herdr | Integración oficial opcional: `herdr integration install opencode` |
+| Skills documentales y diseño | `document-files` local y `frontend-design` fijada |
+| Navegador | Skill y `@playwright/cli@0.1.21` fijados; Chromium del sistema |
+| Gobernanza de skills | Catálogo permitido y mantenimiento manual no autoinvocable |
 
-`config/opencode.json` es la fuente de verdad y se puede usar directamente:
+## Instalar
 
-```bash
-mkdir -p ~/.config/opencode
-install -m 0600 config/opencode.json ~/.config/opencode/opencode.json
-rm -f ~/.config/opencode/opencode.jsonc
-```
+Lee [arch/README.md](arch/README.md) antes de ejecutar:
 
-Incluye la configuracion validada de este equipo:
-
-- servidor local en `127.0.0.1:4096`;
-- agente `build` por defecto y Ponytail 4.8.4;
-- Engram habilitado con el perfil MCP `agent`;
-- Context7 habilitado con API key opcional desde `CONTEXT7_API_KEY`;
-- Codegraph y Playwright registrados pero deshabilitados;
-- permisos de lectura, ejecucion y proteccion de secretos.
-
-El proveedor y los modelos Kimi/Modal no se versionan. Tampoco se incluyen sus
-credenciales.
-
-OpenCode carga la configuracion al iniciar. Cierra y vuelve a abrir el TUI o
-reinicia `opencode-serve` despues de modificarla.
-
-## Arch Linux
-
-```bash
-git clone <url-del-repo> ~/opencode-dotfiles
-cd ~/opencode-dotfiles
-cp config/dotfiles.env dotfiles.env
-chmod 600 dotfiles.env
-${EDITOR:-nano} dotfiles.env
+```sh
 bash arch/install.sh
 ```
 
-El instalador usa el paquete oficial `extra/opencode` y recurre a
-`opencode-bin` de AUR solo si no esta disponible. Tambien crea y habilita el
-servicio `opencode-serve`.
+El instalador **reemplaza el perfil global**, con respaldo completo del anterior
+y de la base Engram. No es un merge: modelos/proveedores personalizados, reglas,
+skills y plugins previos quedan en el respaldo. Las credenciales y sesiones que
+OpenCode guarda en su directorio de datos se conservan. `service.json` conserva sus
+ajustes, fijando la escucha en `127.0.0.1`. El perfil se valida antes de reemplazar
+el anterior. No ejecuta `sudo` ni instala paquetes con pacman por ti.
 
-La app de escritorio es opcional:
+Para desplegar sin reiniciar el servicio: `bash arch/install.sh --no-start`.
+En esta preparación solo se instaló en un entorno temporal aislado.
 
-```bash
-bash arch/desktop.sh
-```
+Tras instalar, abre una terminal Bash/Zsh nueva: `oc` abre OpenCode y
+`oc-last` retoma la última sesión; `oc --session ses_ID` abre una concreta.
+Por SSH, con el mismo usuario y HOME/XDG, se usan los mismos comandos en el
+directorio del proyecto. V2 ya descubre/inicia un servicio separado de la terminal.
 
-## Windows con WSL2
+## Permisos y contexto
 
-Requiere Windows 11 22H2 o posterior. Desde PowerShell:
+- Confirmaciones TUI en `prompt`; shell pide autorización salvo inspecciones Git
+  acotadas. Los comandos de test/build se autorizan por proyecto.
+- Solo se anuncian las skills integradas permitidas y las tres administradas;
+  otras copias globales o de compatibilidad quedan ocultas hasta autorizarlas.
+- Se prioriza código fuente; leer dependencias y artefactos requiere confirmación.
+  La búsqueda se acota por instrucciones, no mediante `watcher.ignore`.
+- Engram: sin captura de prompts, búsquedas de hasta 5 recuerdos y contexto de 8 KiB.
+- Títulos: `agents.title.model` usa `opencode/big-pickle`, gratuito y disponible
+  desde octubre de 2025. El catálogo lo admite, pero la prueba real con V2.0.8
+  recibe HTTP 403 de Zen; véase [verificación](docs/verificacion.md).
+- Astra, Sol, Terra y Luna compactan aproximadamente a 350k (`input: 370000`,
+  buffer de 20k). Se conservan 30k recientes. Detalles y fuentes en el
+  [análisis de contexto y consumo](docs/contraste-dotfiles.md#3-modelos-y-compactación).
 
-```powershell
-git clone <url-del-repo> D:\opencode-dotfiles
-Set-Location D:\opencode-dotfiles
-powershell -ExecutionPolicy Bypass -File .\windows\install.ps1
-```
+## Archivos
 
-El instalador:
+- `AGENTS.md`: reglas del proyecto y criterio de simplicidad para este repositorio.
+- `templates/`: configuración portable, reglas, plugins locales y cuatro skills
+  administradas. `skills-lock.json` fija procedencia, runtime y licencia;
+  `tools/playwright-cli/` contiene el lock npm exacto.
+- `arch/install.sh`: requisitos, Engram oficial verificado, respaldo, despliegue
+  y export de `PONYTAIL_DEFAULT_MODE=lite`, más atajos en Bash/Zsh.
+- `arch/verify.sh`: comprobaciones locales; `--live` comprueba el servicio y MCPs.
+- `arch/check.mjs`: pruebas de los plugins, sin modelos ni red externa.
+- `arch/check-install.py`: instalación y atajos en HOME/XDG aislados, con binarios simulados.
+- `arch/check-documents.sh`: smoke DOCX/PDF con las herramientas nativas.
+- [docs/contraste-dotfiles.md](docs/contraste-dotfiles.md): comparación con el repositorio
+  anterior, propuesta de permisos y pendientes priorizados.
+- [docs/hallazgos.md](docs/hallazgos.md): correcciones al informe y decisiones.
+- [docs/fuentes.md](docs/fuentes.md): documentación primaria, versiones y licencias.
+- [docs/verificacion.md](docs/verificacion.md): evidencia y límites de lo probado.
+- `docs/oc-search-config.md`: informe original, conservado como contexto histórico.
 
-1. instala o reutiliza Debian en WSL2;
-2. aplica `windows/.wslconfig` y habilita systemd;
-3. instala OpenCode dentro de Debian;
-4. crea `opencode-serve` y los launchers `opencode` y `oc`;
-5. ofrece instalar la app de escritorio con Scoop.
-
-Si Windows solicita reiniciar durante la instalacion de WSL, reinicia y vuelve
-a ejecutar el mismo comando.
-
-## Variables
-
-`config/dotfiles.env` contiene los valores predeterminados. `dotfiles.env` en
-la raiz es la copia privada ignorada por Git.
-
-| Variable | Predeterminado | Uso |
-|---|---|---|
-| `WSL_DISTRO` | `Debian` | Distribucion WSL que se instala o reutiliza. |
-| `OPENCODE_WORKDIR` | `.config/opencode` | Directorio de trabajo de `opencode-serve`. |
-| `OPENCODE_SERVE_PORT` | `4096` | Puerto local del API y la web. |
-| `OPENCODE_SERVER_PASSWORD` | vacio | Basic Auth opcional en Arch; WSL lo ignora. |
-| `SKILLS_REPO` | `anthropics/skills` | Origen de los skills oficiales. |
-| `SKILLS_REF` | `main` | Rama, tag o commit del repositorio de skills. |
-
-## Skills, MCP y Engram
-
-Este paso opcional requiere Node 20+ y Python 3.10+. En WSL instala Go 1.25.10
-desde `go.dev` en `~/.local/share/go` si falta un bootstrap 1.21+; Arch usa el
-paquete `go` actual.
-`go install` descarga automaticamente cualquier toolchain posterior que exija
-Engram. Si falta algun runtime, el script ofrece instalarlo.
-
-Arch:
-
-```bash
-bash arch/skills.sh
-```
-
-WSL, usando la ruta del repositorio visible dentro de Linux:
-
-```bash
-oc bash /ruta/al/repositorio/wsl/skills.sh
-```
-
-El script instala:
-
-- `claude-api`, `doc-coauthoring`, `docx`, `frontend-design`, `pdf`,
-  `skill-creator` y `webapp-testing`;
-- un venv Python en `~/.venvs/opencode-skills`;
-- dependencias Node en `~/.opencode-skills/node`;
-- Chromium para Playwright;
-- Engram mediante `go install` en `~/.local/bin/engram`;
-- el plugin oficial de Engram mediante `engram setup opencode`;
-- `config/opencode.json`, `config/AGENTS.md` y la configuracion de Ponytail.
-
-Antes de reemplazar una configuracion existente crea un backup con sufijo
-`.bak-YYYYmmdd-HHMMSS`. El antiguo `opencode.jsonc` se retira para evitar que
-OpenCode mezcle dos configuraciones globales.
-
-Para instalar solamente Engram y la configuracion base:
-
-```bash
-mkdir -p ~/.local/bin ~/.config/opencode
-GOTOOLCHAIN=auto GOBIN="$HOME/.local/bin" go install github.com/Gentleman-Programming/engram/cmd/engram@latest
-~/.local/bin/engram setup opencode
-install -m 0600 config/opencode.json ~/.config/opencode/opencode.json
-rm -f ~/.config/opencode/opencode.jsonc
-```
-
-## Opciones
-
-Context7 funciona sin clave con un limite menor. Para ampliar el limite, define
-la variable en `~/.config/opencode/skills-env.local.sh`:
-
-```bash
-export CONTEXT7_API_KEY=...
-```
-
-Playwright queda deshabilitado globalmente para no cargar sus herramientas en
-todas las sesiones. Un proyecto puede activarlo con:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "playwright": {
-      "enabled": true
-    }
-  }
-}
-```
-
-Ponytail queda instalado y apagado por defecto:
-
-```text
-/ponytail lite
-/ponytail full
-/ponytail off
-```
-
-## Uso
-
-```bash
-opencode
-opencode auth login
-systemctl status opencode-serve
-journalctl -u opencode-serve -e
-```
-
-- Web: `http://localhost:4096/`
-- API y app de escritorio: `http://127.0.0.1:4096`
-
-En Windows, `opencode` abre el TUI dentro de Debian; `oc` abre una shell y
-`oc <comando>` ejecuta un comando en la distribucion.
-
-## Verificacion
-
-```bash
-bash config/skills-smoke-test.sh
-python3 -m json.tool config/opencode.json >/dev/null
-```
-
-El smoke test comprueba runtimes, dependencias, siete skills, Engram, la
-configuracion reconciliada y el servicio local.
-
-## Solucion de Problemas
-
-- Si la web no carga, revisa `systemctl status opencode-serve` y el journal.
-- En WSL, confirma `networkingMode=mirrored` y ejecuta `wsl --shutdown` tras
-  cambiar `.wslconfig`.
-- Si Engram no aparece, confirma que `~/.local/bin` esta en `PATH` y ejecuta
-  `engram setup opencode`.
-- Si Playwright no tiene Chromium, reejecuta `arch/skills.sh` o `wsl/skills.sh`.
-- Si cambias `opencode.json`, reinicia OpenCode; la configuracion no se recarga
-  durante una sesion activa.
+Windows queda pendiente: su guía inicial aún no despliega el perfil completo de
+plugins. La instalación soportada en esta revisión es la de Arch.

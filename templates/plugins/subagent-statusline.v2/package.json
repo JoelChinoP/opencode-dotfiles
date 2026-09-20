@@ -1,0 +1,1 @@
+{ "name": "subagent-statusline-local-v2", "private": true, "type": "module", "exports": { "./tui": "./tui.tsx" } }

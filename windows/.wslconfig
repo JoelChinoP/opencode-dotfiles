@@ -1,9 +1,0 @@
-# Se copia a %USERPROFILE%\.wslconfig. Ejecuta `wsl --shutdown` tras cambiarlo.
-[wsl2]
-memory=8GB
-processors=4
-networkingMode=mirrored
-
-[experimental]
-autoMemoryReclaim=gradual
-sparseVhd=true

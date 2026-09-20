@@ -1,0 +1,8 @@
+{
+  "name": "opencode-dotfiles-playwright-cli",
+  "private": true,
+  "version": "0.1.21",
+  "dependencies": {
+    "@playwright/cli": "0.1.21"
+  }
+}
