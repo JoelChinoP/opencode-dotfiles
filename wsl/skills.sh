@@ -29,8 +29,6 @@ sudo apt-get update -y
 # salgan bien (con no-recommends ya no entran solas).
 sudo apt-get install -y --no-install-recommends \
     libreoffice-writer \
-    libreoffice-calc \
-    libreoffice-impress \
     fonts-liberation \
     fonts-dejavu-core \
     poppler-utils \
@@ -41,21 +39,53 @@ sudo apt-get install -y --no-install-recommends \
     ghostscript \
     imagemagick \
     ffmpeg \
-    jq \
     rsync
 
 # Instalador de runtimes que skills-common.sh (Step 0) invoca si faltan node,
 # python, etc. Traduce tokens abstractos a paquetes apt. Node va via NodeSource
 # para garantizar 20+ (el de los repos Debian suele ir por detras).
+platform_install_go() {
+    local version=go1.25.10 arch filename archive checksum install_root tmpdir
+    case "$(uname -m)" in
+        x86_64) arch=amd64 ;;
+        aarch64|arm64) arch=arm64 ;;
+        *) echo "ERROR: arquitectura no soportada para Go: $(uname -m)" >&2; return 1 ;;
+    esac
+    filename="${version}.linux-${arch}.tar.gz"
+    archive=$(mktemp --suffix=.tar.gz)
+    curl -fsSL "https://go.dev/dl/$filename" -o "$archive"
+    checksum=$(curl -fsSL 'https://go.dev/dl/?mode=json&include=all' | python3 -c '
+import json, sys
+version, filename = sys.argv[1:]
+for release in json.load(sys.stdin):
+    if release["version"] == version:
+        for file in release["files"]:
+            if file["filename"] == filename:
+                print(file["sha256"])
+                raise SystemExit
+raise SystemExit(1)
+' "$version" "$filename")
+    printf '%s  %s\n' "$checksum" "$archive" | sha256sum -c -
+    install_root="$HOME/.local/share/go"
+    tmpdir=$(mktemp -d)
+    tar -C "$tmpdir" -xzf "$archive"
+    rm -rf "$install_root"
+    mkdir -p "$(dirname "$install_root")"
+    mv "$tmpdir/go" "$install_root"
+    rmdir "$tmpdir"
+    rm -f "$archive"
+    export PATH="$install_root/bin:$PATH"
+}
+
 platform_install_runtimes() {
-    local t pkgs=() want_node=0
+    local t pkgs=() want_node=0 want_go=0
     for t in "$@"; do
         case "$t" in
             python) pkgs+=(python3 python3-venv python3-pip) ;;
             node)   want_node=1 ;;
+            go)     want_go=1 ;;
             git)    pkgs+=(git) ;;
             curl)   pkgs+=(curl ca-certificates) ;;
-            jq)     pkgs+=(jq) ;;
         esac
     done
     sudo apt-get update -y
@@ -66,6 +96,10 @@ platform_install_runtimes() {
         echo "==> Instalando Node 22 LTS (NodeSource)"
         curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
         sudo apt-get install -y --no-install-recommends nodejs
+    fi
+    if [ "$want_go" -eq 1 ]; then
+        echo "==> Instalando Go 1.25.10 desde go.dev"
+        platform_install_go
     fi
 }
 

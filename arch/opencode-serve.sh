@@ -20,18 +20,9 @@ if [ -f "$HOME/.config/opencode/skills-env.sh" ]; then
     . "$HOME/.config/opencode/skills-env.sh"
 fi
 
-: "${OPENCODE_WORKDIR:=/home/joel}"
 : "${OPENCODE_SERVE_PORT:=4096}"
 
 export PATH="$HOME/.local/bin:/usr/bin:$PATH"
-
-if [[ "$OPENCODE_WORKDIR" = /* ]]; then
-    WORKDIR="$OPENCODE_WORKDIR"
-else
-    WORKDIR="$HOME/$OPENCODE_WORKDIR"
-fi
-
-cd "$WORKDIR"
 
 export OPENCODE_SERVER_PASSWORD="${OPENCODE_SERVER_PASSWORD:-}"
 

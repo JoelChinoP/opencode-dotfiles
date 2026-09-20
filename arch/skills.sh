@@ -34,7 +34,6 @@ PKGS=(
     ghostscript
     imagemagick
     ffmpeg
-    jq
     rsync
 )
 sudo pacman -S --needed --noconfirm "${PKGS[@]}"
@@ -56,9 +55,9 @@ platform_install_runtimes() {
         case "$t" in
             python) pkgs+=(python python-pip) ;;
             node)   pkgs+=(nodejs npm) ;;
+            go)     pkgs+=(go) ;;
             git)    pkgs+=(git) ;;
             curl)   pkgs+=(curl) ;;
-            jq)     pkgs+=(jq) ;;
         esac
     done
     if [ "${#pkgs[@]}" -gt 0 ]; then

@@ -20,19 +20,10 @@ if [ -f "$HOME/.config/opencode/skills-env.sh" ]; then
     . "$HOME/.config/opencode/skills-env.sh"
 fi
 
-: "${OPENCODE_WORKDIR:=/home/joel}"
 : "${OPENCODE_SERVE_PORT:=4096}"
 
 # systemd arranca con un PATH minimo; aseguramos el bin de opencode.
 export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
-
-if [[ "$OPENCODE_WORKDIR" = /* ]]; then
-    WORKDIR="$OPENCODE_WORKDIR"
-else
-    WORKDIR="$HOME/$OPENCODE_WORKDIR"
-fi
-
-cd "$WORKDIR"
 
 # WSL solo se publica por localhost/mirrored networking y siempre queda sin auth.
 unset OPENCODE_SERVER_PASSWORD

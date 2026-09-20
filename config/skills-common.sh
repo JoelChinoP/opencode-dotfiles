@@ -70,16 +70,18 @@ elif [ -f "$REPO_DIR/dotfiles.env" ]; then
 fi
 : "${SKILLS_REPO:=https://github.com/anthropics/skills}"
 : "${SKILLS_REF:=main}"
+: "${OPENCODE_SERVE_PORT:=4096}"
 
 mkdir -p "$OPENCODE_CFG_DIR" "$SKILL_DIR" "$NODE_AISLADO" "$PONYTAIL_CFG_DIR" "$DEST"
+export PATH="$HOME/.local/share/go/bin:$HOME/.local/bin:$PATH"
 
 # --- Step 0: sanity de runtimes -------------------------------------------------
 log "Step 0 - chequeo de runtimes"
 
-# Runtimes minimos. Si falta alguno (o Node/Python no llegan al minimo) y el
+# Runtimes minimos. Si falta alguno (o Node/Python/Go no llegan al minimo) y el
 # wrapper de plataforma definio 'platform_install_runtimes', se OFRECE instalarlo
 # con el gestor de paquetes del sistema; si el usuario responde que no, se cancela
-# limpio. git/curl deberian venir de provision.sh; jq lo instala el Step 1.
+# limpio. git/curl deberian venir de provision.sh.
 node_ok() {
     have node || return 1
     local maj; maj=$(node -p 'process.versions.node' 2>/dev/null | cut -d. -f1)
@@ -89,14 +91,23 @@ python_ok() {
     have python3 || return 1
     python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)' 2>/dev/null
 }
+go_bootstrap_ok() {
+    have go || return 1
+    local version major minor
+    version=$(go env GOVERSION 2>/dev/null) || return 1
+    version=${version#go}
+    IFS=. read -r major minor _ <<<"$version"
+    [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] \
+        && (( major > 1 || (major == 1 && minor >= 21) ))
+}
 
 missing=()
 python_ok || missing+=(python)
 node_ok   || missing+=(node)
+go_bootstrap_ok || missing+=(go)
 have npm  || [[ " ${missing[*]} " == *" node "* ]] || missing+=(node)  # npm viene con node
 have git  || missing+=(git)
 have curl || missing+=(curl)
-have jq   || missing+=(jq)
 
 if [ "${#missing[@]}" -gt 0 ]; then
     warn "faltan o no cumplen el minimo: ${missing[*]}"
@@ -117,13 +128,20 @@ have python3 || die "python3 sigue ausente tras el intento de instalacion"
 PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 python_ok || die "se requiere Python 3.10+ (tienes $PYVER)"
 node_ok   || die "se requiere Node 20+ (tienes $(node -v 2>/dev/null || echo ninguno))"
+go_bootstrap_ok || die "se requiere Go 1.21+ para descargar la toolchain de Engram (tienes $(go env GOVERSION 2>/dev/null || echo ninguno))"
 have npm  || die "falta npm (deberia venir con node)"
-have jq   || die "falta jq"
-echo "  Python $PYVER  /  Node $(node -p 'process.versions.node')  OK"
+echo "  Python $PYVER  /  Node $(node -p 'process.versions.node')  /  $(go env GOVERSION)  OK"
 
-# --- Step 2: clonar skills (sparse-checkout) -----------------------------------
+# --- Step 2: Engram -------------------------------------------------------------
+log "Step 2 - instalar Engram con Go"
+mkdir -p "$HOME/.local/bin"
+GOTOOLCHAIN=auto GOBIN="$HOME/.local/bin" \
+    go install github.com/Gentleman-Programming/engram/cmd/engram@latest
+echo "  $($HOME/.local/bin/engram --version)"
+
+# --- Step 3: clonar skills (sparse-checkout) -----------------------------------
 # Step 1 (binarios) lo hizo ya el wrapper de plataforma.
-log "Step 2 - clonar/actualizar skills desde $SKILLS_REPO ($SKILLS_REF)"
+log "Step 3 - clonar/actualizar skills desde $SKILLS_REPO ($SKILLS_REF)"
 CLONE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/opencode-dotfiles/anthropic-skills"
 mkdir -p "$(dirname "$CLONE_DIR")"
 if [ -d "$CLONE_DIR/.git" ]; then
@@ -134,8 +152,8 @@ else
         || die "$CLONE_DIR existe pero no es un clon git; muevelo o eliminalo manualmente"
     git clone --depth 1 --filter=blob:none --sparse \
         --branch "$SKILLS_REF" "$SKILLS_REPO" "$CLONE_DIR" >/dev/null
-    git -C "$CLONE_DIR" sparse-checkout set skills >/dev/null
 fi
+git -C "$CLONE_DIR" sparse-checkout set "${SKILLS[@]/#/skills/}" >/dev/null
 
 # Verificar que los skills seleccionados esten en el upstream
 MISSING_UPSTREAM=()
@@ -148,19 +166,12 @@ if [ ${#MISSING_UPSTREAM[@]} -gt 0 ]; then
 fi
 
 # rsync -a --delete por skill para idempotencia limpia (sin acumular basura).
-if ! have rsync; then
-    warn "rsync no esta instalado; usando cp -r (puede dejar archivos viejos)."
-fi
+have rsync || die "falta rsync (deberia instalarlo el wrapper de plataforma)"
 for s in "${SKILLS[@]}"; do
     SRC="$CLONE_DIR/skills/$s"
     DST="$SKILL_DIR/$s"
     [ -d "$SRC" ] || continue
-    if have rsync; then
-        rsync -a --delete "$SRC/" "$DST/"
-    else
-        rm -rf "$DST"
-        cp -r "$SRC" "$DST"
-    fi
+    rsync -a --delete "$SRC/" "$DST/"
 done
 echo "  skills sincronizados: ${#SKILLS[@]}"
 
@@ -172,21 +183,19 @@ for s in "${PRUNED_SKILLS[@]}"; do
     fi
 done
 
-# --- Step 3: venv Python --------------------------------------------------------
-log "Step 3 - venv Python aislado en $PYVENV"
+# --- Step 4: venv Python --------------------------------------------------------
+log "Step 4 - venv Python aislado en $PYVENV"
 if [ ! -x "$PYVENV/bin/python" ]; then
     python3 -m venv "$PYVENV"
 fi
 "$PYVENV/bin/python" -m pip install --quiet --upgrade pip
 "$PYVENV/bin/pip" install --quiet --upgrade --upgrade-strategy only-if-needed \
-    python-docx openpyxl pandas \
+    python-docx pandas \
     pypdf pdfplumber reportlab pytesseract pdf2image \
-    "markitdown[all]" \
-    Pillow beautifulsoup4 markdown \
-    playwright fastmcp mcp json5
+    Pillow playwright
 
-# --- Step 4: browsers de Playwright (solo Chromium) ----------------------------
-log "Step 4 - browsers de Playwright (chromium)"
+# --- Step 5: browsers de Playwright (solo Chromium) ----------------------------
+log "Step 5 - browsers de Playwright (chromium)"
 HAS_CHROMIUM=0
 for d in "$HOME/.cache/ms-playwright/chromium-"*; do
     [ -d "$d" ] && HAS_CHROMIUM=1 && break
@@ -197,16 +206,21 @@ else
     echo "  chromium ya descargado [skip]"
 fi
 
-# --- Step 5: node_modules aislado ----------------------------------------------
-log "Step 5 - node_modules aislado en $NODE_AISLADO"
-if [ ! -f "$NODE_AISLADO/package.json" ]; then
-    (cd "$NODE_AISLADO" && npm init -y >/dev/null)
-fi
-# @playwright/mcp se instala aqui (y opencode.jsonc lo lanza con node directo)
+# --- Step 6: node_modules aislado ----------------------------------------------
+log "Step 6 - node_modules aislado en $NODE_AISLADO"
+# @playwright/mcp se instala aqui (y opencode.json lo lanza con node directo)
 # en vez de 'npx -y @latest' por sesion: sin cold-start ni re-descargas cuando
 # @latest bumpea. Se actualiza cada vez que reejecutes skills.sh.
-(cd "$NODE_AISLADO" && npm install --silent --omit=dev --no-audit --no-fund \
-    docx pptxgenjs @modelcontextprotocol/sdk @playwright/mcp@latest)
+cat >"$NODE_AISLADO/package.json" <<'JSON'
+{
+  "private": true,
+  "dependencies": {
+    "@playwright/mcp": "latest",
+    "docx": "latest"
+  }
+}
+JSON
+(cd "$NODE_AISLADO" && npm install --silent --omit=dev --no-audit --no-fund)
 
 # Chromium para la version de Playwright del MCP (no-op si ya esta en
 # ~/.cache/ms-playwright; comparte cache con el del venv si coinciden).
@@ -218,8 +232,8 @@ else
     warn "no encuentro el CLI de playwright en $NODE_AISLADO; el MCP descargara el browser al primer uso"
 fi
 
-# --- Step 6: generar skills-env.sh ---------------------------------------------
-log "Step 6 - generar $SKILLS_ENV_FILE"
+# --- Step 7: generar skills-env.sh ---------------------------------------------
+log "Step 7 - generar $SKILLS_ENV_FILE"
 cat >"$SKILLS_ENV_FILE" <<'ENV'
 # Generated by opencode-dotfiles skills.sh -- do not edit manually.
 # Se cargan los paths aislados de Python y Node de los skills.
@@ -227,7 +241,7 @@ cat >"$SKILLS_ENV_FILE" <<'ENV'
 # o el opencode-serve via systemd). No contamina shells del usuario.
 
 export VIRTUAL_ENV="$HOME/.venvs/opencode-skills"
-export PATH="$VIRTUAL_ENV/bin:$PATH"
+export PATH="$HOME/.local/share/go/bin:$HOME/.local/bin:$VIRTUAL_ENV/bin:$PATH"
 # NODE_PATH actua como FALLBACK: Node busca primero en ./node_modules.
 # Se appendea para no pisar otros NODE_PATH preexistentes.
 export NODE_PATH="${NODE_PATH:+$NODE_PATH:}$HOME/.opencode-skills/node/node_modules"
@@ -241,8 +255,8 @@ fi
 ENV
 chmod 0644 "$SKILLS_ENV_FILE"
 
-# --- Step 7: hook al shell -----------------------------------------------------
-log "Step 7 - hook al shell del usuario"
+# --- Step 8: hook al shell -----------------------------------------------------
+log "Step 8 - hook al shell del usuario"
 SHELL_BLOCK=$(cat <<'BLOCK'
 # >>> opencode-dotfiles skills env >>>
 # Wrappea `opencode` para que cargue el venv y NODE_PATH aislados solo
@@ -270,65 +284,58 @@ add_hook_if_missing() {
 add_hook_if_missing "$HOME/.zshrc"
 add_hook_if_missing "$HOME/.bashrc"
 
-# --- Step 8: merge del opencode.jsonc global -----------------------------------
-log "Step 8 - merge de $OPENCODE_CFG_DIR/opencode.jsonc"
-CFG_FILE="$OPENCODE_CFG_DIR/opencode.jsonc"
-TMPL="$CONFIG_DIR/opencode.jsonc.tmpl"
-TMP_OUT="$(mktemp --tmpdir opencode.jsonc.XXXXXX)"
-trap 'rm -f "$TMP_OUT"' EXIT
+# --- Step 9: configuracion global ----------------------------------------------
+log "Step 9 - instalar configuracion global"
+CFG_FILE="$OPENCODE_CFG_DIR/opencode.json"
+LEGACY_CFG="$OPENCODE_CFG_DIR/opencode.jsonc"
+python3 -m json.tool "$CONFIG_DIR/opencode.json" >/dev/null \
+    || die "$CONFIG_DIR/opencode.json no es JSON valido"
+if [[ ! "$OPENCODE_SERVE_PORT" =~ ^[0-9]+$ ]] \
+    || (( OPENCODE_SERVE_PORT < 1 || OPENCODE_SERVE_PORT > 65535 )); then
+    die "OPENCODE_SERVE_PORT no es un puerto valido"
+fi
+for existing in "$CFG_FILE" "$LEGACY_CFG"; do
+    if [ -f "$existing" ]; then
+        BAK="$existing.bak-$(date +%Y%m%d-%H%M%S)"
+        cp -f "$existing" "$BAK"
+        echo "  backup: $BAK"
+    fi
+done
+TMP_CFG="$(mktemp --tmpdir opencode.json.XXXXXX)"
+trap 'rm -f "$TMP_CFG"' EXIT
+python3 - "$CONFIG_DIR/opencode.json" "$OPENCODE_SERVE_PORT" >"$TMP_CFG" <<'PY'
+import json, pathlib, sys
 
-BAK="(no se creo backup: el archivo no existia)"
-if [ -f "$CFG_FILE" ]; then
-    BAK="$CFG_FILE.bak-$(date +%Y%m%d-%H%M%S)"
-    cp -f "$CFG_FILE" "$BAK"
-    echo "  backup: $BAK"
-fi
-# Ejecutar el merger usando el python del venv (donde json5 esta instalado).
-if ! "$PYVENV/bin/python" "$CONFIG_DIR/skills-merge-jsonc.py" \
-        "${CFG_FILE:-/dev/null}" "$TMPL" \
-        --remove-plugin "opencode-orchestrator" \
-        --remove-agent Commander \
-        --remove-agent Planner \
-        --remove-agent Worker \
-        --remove-agent Reviewer \
-        --remove-agent commander \
-        --remove-agent planner \
-        --remove-agent worker \
-        --remove-agent reviewer >"$TMP_OUT"; then
-    die "fallo el merge del opencode.jsonc; revisa $CFG_FILE manualmente. Backup en $BAK"
-fi
-# Validar resultado
-if ! "$PYVENV/bin/python" -c "import json,sys; json.load(open(sys.argv[1]))" "$TMP_OUT"; then
-    die "merge produjo JSON invalido; abortando. Backup intacto en $BAK"
-fi
-mv -f "$TMP_OUT" "$CFG_FILE"
-chmod 0600 "$CFG_FILE"
+config = json.loads(pathlib.Path(sys.argv[1]).read_text())
+config["server"]["port"] = int(sys.argv[2])
+json.dump(config, sys.stdout, indent=2)
+sys.stdout.write("\n")
+PY
+install -m 0600 "$TMP_CFG" "$CFG_FILE"
+rm -f "$LEGACY_CFG"
+
+# Instala el plugin oficial y la statusline; el JSON base conserva la
+# configuracion MCP, por eso se repone despues del setup.
+"$HOME/.local/bin/engram" setup opencode
+install -m 0600 "$TMP_CFG" "$CFG_FILE"
 echo "  $CFG_FILE actualizado"
 
-# --- Step 9: Ponytail global apagado -------------------------------------------
-log "Step 9 - Ponytail global (modo inicial off)"
-PONYTAIL_TMPL="$CONFIG_DIR/ponytail.json.tmpl"
-TMP_OUT="$(mktemp --tmpdir ponytail.json.XXXXXX)"
-PONYTAIL_BAK="(no se creo backup: el archivo no existia)"
+# --- Step 10: Ponytail global apagado ------------------------------------------
+log "Step 10 - Ponytail global (modo inicial off)"
 if [ -f "$PONYTAIL_CFG_FILE" ]; then
     PONYTAIL_BAK="$PONYTAIL_CFG_FILE.bak-$(date +%Y%m%d-%H%M%S)"
     cp -f "$PONYTAIL_CFG_FILE" "$PONYTAIL_BAK"
     echo "  backup: $PONYTAIL_BAK"
 fi
-if ! "$PYVENV/bin/python" "$CONFIG_DIR/skills-merge-jsonc.py" \
-        "${PONYTAIL_CFG_FILE:-/dev/null}" "$PONYTAIL_TMPL" >"$TMP_OUT"; then
-    die "fallo el merge de Ponytail. Backup en $PONYTAIL_BAK"
-fi
-mv -f "$TMP_OUT" "$PONYTAIL_CFG_FILE"
-chmod 0600 "$PONYTAIL_CFG_FILE"
+install -m 0600 "$CONFIG_DIR/ponytail.json" "$PONYTAIL_CFG_FILE"
 printf '%s\n' off >"$PONYTAIL_STATE_FILE"
 chmod 0600 "$PONYTAIL_STATE_FILE"
 echo "  $PONYTAIL_CFG_FILE actualizado; modo activo: off"
 
-# --- Step 10: AGENTS.md global -------------------------------------------------
-log "Step 10 - AGENTS.md global"
+# --- Step 11: AGENTS.md global -------------------------------------------------
+log "Step 11 - AGENTS.md global"
 AGENTS_FILE="$OPENCODE_CFG_DIR/AGENTS.md"
-AGENTS_TMPL="$CONFIG_DIR/AGENTS.md.tmpl"
+AGENTS_TMPL="$CONFIG_DIR/AGENTS.md"
 if [ -f "$AGENTS_FILE" ]; then
     if grep -q '<!-- opencode-dotfiles -->' "$AGENTS_FILE"; then
         cp -f "$AGENTS_TMPL" "$AGENTS_FILE"
@@ -344,8 +351,8 @@ else
     echo "  $AGENTS_FILE creado"
 fi
 
-# --- Step 11: re-copiar opencode-serve.sh al DEST (con source del env) ---------
-log "Step 11 - actualizar opencode-serve.sh en $DEST"
+# --- Step 12: re-copiar opencode-serve.sh al DEST (con source del env) ---------
+log "Step 12 - actualizar opencode-serve.sh en $DEST"
 SRC_SERVE="$REPO_DIR/$PLATFORM/opencode-serve.sh"
 if [ -f "$SRC_SERVE" ]; then
     cp -f "$SRC_SERVE" "$DEST/opencode-serve.sh"
@@ -361,8 +368,8 @@ else
     warn "no se encontro $SRC_SERVE; ejecuta provision.sh antes de skills.sh"
 fi
 
-# --- Step 12: smoke test -------------------------------------------------------
-log "Step 12 - smoke test"
+# --- Step 13: smoke test -------------------------------------------------------
+log "Step 13 - smoke test"
 bash "$CONFIG_DIR/skills-smoke-test.sh" || warn "el smoke test reporto fallos; revisalos"
 
 echo ""
@@ -371,7 +378,8 @@ echo " Skills + configuracion global instaladas."
 echo "   Skills:        $SKILL_DIR  (${#SKILLS[@]} skills)"
 echo "   venv Python:   $PYVENV"
 echo "   node aislado:  $NODE_AISLADO"
-echo "   Config:        $OPENCODE_CFG_DIR/opencode.jsonc"
+echo "   Config:        $OPENCODE_CFG_DIR/opencode.json"
+echo "   Engram:        $HOME/.local/bin/engram"
 echo "   Ponytail:      $PONYTAIL_CFG_FILE  (off por defecto)"
 echo "   Reglas:        $OPENCODE_CFG_DIR/AGENTS.md"
 echo "   Env file:      $SKILLS_ENV_FILE"
@@ -381,8 +389,6 @@ echo "   opencode"
 echo ""
 echo " Tokens opcionales (exportalos en tu shell rc si los quieres):"
 echo "   CONTEXT7_API_KEY   - mayor rate-limit en docs (https://context7.com)"
-echo "   GITHUB_TOKEN       - GitHub MCP (descomenta tambien el bloque en"
-echo "                        $CFG_FILE)"
 echo " Playwright MCP queda desactivado hasta que un proyecto lo habilite."
 echo " Ponytail queda cargado pero en off; activalo con /ponytail lite o full."
 echo " Exa/websearch queda habilitado globalmente."

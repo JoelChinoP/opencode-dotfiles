@@ -4,7 +4,6 @@
 # No requiere Administrador (Scoop es por usuario).
 . "$PSScriptRoot\common.ps1"
 
-$repo      = Get-RepoRoot
 $cfg       = Read-OpenCodeConfig
 $servePort = $cfg['OPENCODE_SERVE_PORT']
 
@@ -43,17 +42,14 @@ if ($buckets -notmatch 'extras') {
 Write-Step "Instalando opencode-desktop"
 scoop install extras/opencode-desktop
 
-# --- Apuntar la app al servidor de WSL via opencode.jsonc ---
-# Metodo oficial: una seccion "server" en %USERPROFILE%\.config\opencode\opencode.jsonc
+# --- Apuntar la app al servidor de WSL via opencode.json ---
 $cfgDir  = Join-Path $env:USERPROFILE '.config\opencode'
-$cfgFile = Join-Path $cfgDir 'opencode.jsonc'
+$cfgFile = Join-Path $cfgDir 'opencode.json'
+$legacyCfg = Join-Path $cfgDir 'opencode.jsonc'
 New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
 
-$jsonc = @"
+$json = @"
 {
-  // Generado por opencode-dotfiles: la app de escritorio se conecta al
-  // servidor 'opencode serve' que corre en WSL (Debian).
-  // Con networkingMode=mirrored, 127.0.0.1 de Windows == 127.0.0.1 de WSL.
   "`$schema": "https://opencode.ai/config.json",
   "server": {
     "hostname": "127.0.0.1",
@@ -62,15 +58,13 @@ $jsonc = @"
 }
 "@
 
-if (Test-Path -LiteralPath $cfgFile) {
-    $bak = "$cfgFile.bak-$(Get-Date -Format yyyyMMdd-HHmmss)"
-    Copy-Item -LiteralPath $cfgFile -Destination $bak -Force
-    Write-Note "Ya existia opencode.jsonc; respaldado en $bak"
-    Write-Note "NO se sobrescribio tu config. Anade manualmente esta seccion si falta:"
+if ((Test-Path -LiteralPath $cfgFile) -or (Test-Path -LiteralPath $legacyCfg)) {
+    Write-Note "Ya existe una configuracion; no se sobrescribio."
+    Write-Note "Anade esta seccion si falta:"
     Write-Host  '      "server": { "hostname": "127.0.0.1", "port": ' -NoNewline
     Write-Host  "$servePort }"
 } else {
-    Set-Content -LiteralPath $cfgFile -Value $jsonc -Encoding UTF8
+    Set-Content -LiteralPath $cfgFile -Value $json -Encoding UTF8
     Write-Ok "Config creada: $cfgFile  (server -> 127.0.0.1:$servePort)"
 }
 
@@ -80,23 +74,6 @@ if ($envPort) {
     Write-Note "Tienes OPENCODE_PORT=$envPort en tu entorno de Windows. Esto puede"
     Write-Note "hacer que la app levante su PROPIO server local y no conecte a WSL."
     Write-Note "Si la app falla, borra esa variable: setx OPENCODE_PORT """""
-}
-
-# --- Validacion: el API de WSL responde en localhost:servePort? ---
-Write-Step "Validando conexion con el servidor (localhost:$servePort)"
-$ok = $false
-try {
-    $c = New-Object Net.Sockets.TcpClient
-    $iar = $c.BeginConnect('127.0.0.1', [int]$servePort, $null, $null)
-    if ($iar.AsyncWaitHandle.WaitOne(2000)) { $c.EndConnect($iar); $ok = $true }
-    $c.Close()
-} catch { $ok = $false }
-
-if ($ok) {
-    Write-Ok "El servidor responde en 127.0.0.1:$servePort. La app deberia conectar."
-} else {
-    Write-Note "No respondio aun. Arranca WSL (ejecuta 'oc' una vez) para que systemd"
-    Write-Note "levante 'opencode-serve', y luego abre la app de escritorio."
 }
 
 Write-Step "App de escritorio lista"

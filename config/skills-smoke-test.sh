@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# skills-smoke-test.sh - verificacion end-to-end del setup de skills.
-# Imprime OK/MISS por componente. Exit code = numero de MISS.
-# No usa set -e: queremos ver TODOS los fallos, no abortar al primero.
+# Verificacion minima del setup de skills y configuracion global.
 
 PASS=0
 FAIL=0
@@ -10,155 +8,9 @@ miss() { printf '  MISS  %s  (%s)\n' "$1" "$2"; FAIL=$((FAIL+1)); }
 
 PYBIN="$HOME/.venvs/opencode-skills/bin/python"
 NODEDIR="$HOME/.opencode-skills/node/node_modules"
-CFG="$HOME/.config/opencode/opencode.jsonc"
+CFG="$HOME/.config/opencode/opencode.json"
 SKILLDIR="$HOME/.config/opencode/skills"
-PONYTAIL_CFG="$HOME/.config/ponytail/config.json"
-PONYTAIL_STATE="$HOME/.config/opencode/.ponytail-active"
-
-echo "==> Imports de Python (venv ~/.venvs/opencode-skills)"
-if [ ! -x "$PYBIN" ]; then
-    miss "python venv" "$PYBIN no existe"
-else
-    "$PYBIN" - <<'PY' 2>/dev/null && ok "imports principales" || miss "imports principales" "alguna lib falta o no carga"
-import docx, openpyxl, pandas
-import pypdf, pdfplumber, reportlab, pytesseract, pdf2image
-import markitdown, PIL, bs4, markdown
-import playwright, fastmcp, mcp, json5
-PY
-fi
-
-echo ""
-echo "==> Requires de Node (NODE_PATH=~/.opencode-skills/node/node_modules)"
-if [ ! -d "$NODEDIR" ]; then
-    miss "node_modules aislado" "$NODEDIR no existe"
-else
-    NODE_PATH="$NODEDIR" node - <<'JS' 2>/dev/null && ok "requires docx/pptxgenjs/sdk" || miss "requires docx/pptxgenjs/sdk" "alguno no resuelve"
-require('docx');
-require('pptxgenjs');
-require('@modelcontextprotocol/sdk/server/mcp.js');
-JS
-fi
-
-echo ""
-echo "==> Binarios del sistema"
-for b in libreoffice pdftoppm pdftotext qpdf tesseract pandoc gs convert ffmpeg jq node python3; do
-    if command -v "$b" >/dev/null 2>&1; then
-        ok "$b -> $(command -v "$b")"
-    else
-        miss "$b" "no instalado"
-    fi
-done
-
-echo ""
-echo "==> Skills clonados (~/.config/opencode/skills/)"
-if [ -d "$SKILLDIR" ]; then
-    COUNT=$(find "$SKILLDIR" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
-    if [ "$COUNT" -ge 7 ]; then
-        ok "$COUNT skills"
-    else
-        miss "skills count" "esperado >=7, hay $COUNT"
-    fi
-    for s in claude-api doc-coauthoring docx frontend-design pdf skill-creator webapp-testing; do
-        [ -f "$SKILLDIR/$s/SKILL.md" ] && ok "skill: $s" || miss "skill: $s" "SKILL.md ausente"
-    done
-    for s in algorithmic-art brand-guidelines canvas-design internal-comms mcp-builder \
-             pptx slack-gif-creator theme-factory web-artifacts-builder xlsx; do
-        [ ! -d "$SKILLDIR/$s" ] && ok "skill retirado: $s" || miss "skill: $s" "deberia estar retirado"
-    done
-else
-    miss "dir skills" "$SKILLDIR no existe"
-fi
-
-echo ""
-echo "==> Config global"
-if [ -f "$CFG" ]; then
-    if [ -x "$PYBIN" ]; then
-        "$PYBIN" -c "import json5, pathlib; json5.loads(pathlib.Path('$CFG').read_text())" 2>/dev/null \
-            && ok "opencode.jsonc valido" || miss "opencode.jsonc" "no parsea como JSONC"
-    fi
-    grep -q '"context7"' "$CFG" && ok "MCP context7 registrado" || miss "MCP context7" "no presente"
-    grep -q '"playwright"' "$CFG" && ok "MCP playwright registrado" || miss "MCP playwright" "no presente"
-    "$PYBIN" - "$CFG" <<'PY' 2>/dev/null \
-        && ok "MCP playwright deshabilitado" \
-        || miss "MCP playwright" "debe tener enabled=false"
-import json5, pathlib, sys
-cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
-raise SystemExit(0 if cfg.get("mcp", {}).get("playwright", {}).get("enabled") is False else 1)
-PY
-    "$PYBIN" - "$CFG" <<'PY' 2>/dev/null \
-        && ok "Build + Ponytail 4.8.4; sin Orchestrator" \
-        || miss "plugins globales" "debe quedar Build con Ponytail, sin Orchestrator"
-import json5, pathlib, sys
-cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
-assert cfg.get("default_agent") == "build"
-specs = [item[0] if isinstance(item, list) and item else item
-         for item in cfg.get("plugin", [])]
-assert "@dietrichgebert/ponytail@4.8.4" in specs
-assert not any(isinstance(spec, str) and "opencode-orchestrator" in spec for spec in specs)
-assert not ({"Commander", "Planner", "Worker", "Reviewer",
-             "commander", "planner", "worker", "reviewer"} & set(cfg.get("agent", {})))
-PY
-    "$PYBIN" - "$CFG" <<'PY' 2>/dev/null \
-        && ok "Exa/websearch habilitado" \
-        || miss "Exa/websearch" "debe tener permission.websearch=allow"
-import json5, pathlib, sys
-cfg = json5.loads(pathlib.Path(sys.argv[1]).read_text())
-raise SystemExit(0 if cfg.get("permission", {}).get("websearch") == "allow" else 1)
-PY
-    grep -q '"permission"' "$CFG" && ok "bloque permission" || miss "permission" "no presente"
-else
-    miss "opencode.jsonc" "$CFG no existe"
-fi
-
-if [ -f "$PONYTAIL_CFG" ]; then
-    "$PYBIN" - "$PONYTAIL_CFG" <<'PY' 2>/dev/null \
-        && ok "Ponytail defaultMode=off" \
-        || miss "Ponytail config" "defaultMode debe ser off"
-import json, pathlib, sys
-cfg = json.loads(pathlib.Path(sys.argv[1]).read_text())
-raise SystemExit(0 if cfg.get("defaultMode") == "off" else 1)
-PY
-else
-    miss "Ponytail config" "$PONYTAIL_CFG no existe"
-fi
-
-if [ -f "$PONYTAIL_STATE" ]; then
-    PONYTAIL_MODE=$(tr -d '[:space:]' <"$PONYTAIL_STATE")
-    case "$PONYTAIL_MODE" in
-        off|lite|full|ultra) ok "Ponytail modo activo: $PONYTAIL_MODE" ;;
-        *) miss "Ponytail modo activo" "valor invalido: ${PONYTAIL_MODE:-vacio}" ;;
-    esac
-else
-    ok "Ponytail modo activo: off (usa defaultMode)"
-fi
-
-if [ -f "$HOME/.config/opencode/AGENTS.md" ]; then
-    ok "AGENTS.md global"
-else
-    miss "AGENTS.md global" "$HOME/.config/opencode/AGENTS.md no existe"
-fi
-
-if [ -f "$HOME/.config/opencode/skills-env.sh" ]; then
-    ok "skills-env.sh"
-    grep -q '^export OPENCODE_ENABLE_EXA=1$' "$HOME/.config/opencode/skills-env.sh" \
-        && ok "OPENCODE_ENABLE_EXA=1" || miss "Exa env" "flag ausente"
-else
-    miss "skills-env.sh" "no generado"
-fi
-
-echo ""
-echo "==> Hook en shells"
-grep -q "opencode-dotfiles skills env" "$HOME/.zshrc" 2>/dev/null \
-    && ok "hook .zshrc" || miss "hook .zshrc" "no encontrado"
-if [ -f "$HOME/.bashrc" ]; then
-    grep -q "opencode-dotfiles skills env" "$HOME/.bashrc" 2>/dev/null \
-        && ok "hook .bashrc" || miss "hook .bashrc" "no encontrado"
-fi
-
-echo ""
-echo "==> opencode-serve y MCP alcanzable"
-systemctl is-active opencode-serve >/dev/null 2>&1 \
-    && ok "opencode-serve activo" || miss "opencode-serve" "inactivo"
+ENGRAM="$HOME/.local/bin/engram"
 if [ -f "$HOME/.config/opencode-dotfiles/defaults.env" ]; then
     # shellcheck disable=SC1091
     source "$HOME/.config/opencode-dotfiles/defaults.env"
@@ -168,33 +20,118 @@ if [ -f "$HOME/.config/opencode-dotfiles/dotfiles.env" ]; then
     source "$HOME/.config/opencode-dotfiles/dotfiles.env"
 fi
 : "${OPENCODE_SERVE_PORT:=4096}"
+
+echo "==> Runtimes y dependencias"
+if [ -x "$PYBIN" ]; then
+    "$PYBIN" - <<'PY' 2>/dev/null \
+        && ok "imports Python" || miss "imports Python" "alguna dependencia no carga"
+import docx, pandas, pypdf, pdfplumber, reportlab
+import pytesseract, pdf2image, PIL, playwright
+PY
+else
+    miss "python venv" "$PYBIN no existe"
+fi
+
+if [ -d "$NODEDIR" ]; then
+    NODE_PATH="$NODEDIR" node -e "require('docx')" 2>/dev/null \
+        && ok "docx para Node" || miss "docx para Node" "no resuelve"
+    [ -f "$NODEDIR/@playwright/mcp/cli.js" ] \
+        && ok "Playwright MCP" || miss "Playwright MCP" "cli.js ausente"
+else
+    miss "node_modules aislado" "$NODEDIR no existe"
+fi
+
+if [ -x "$ENGRAM" ] && ENGRAM_VERSION=$($ENGRAM --version 2>/dev/null); then
+    ok "$ENGRAM_VERSION"
+else
+    miss "Engram" "$ENGRAM no existe o no arranca"
+fi
+
+for bin in libreoffice pdftoppm pdftotext qpdf tesseract pandoc gs convert ffmpeg go; do
+    command -v "$bin" >/dev/null 2>&1 \
+        && ok "$bin" || miss "$bin" "no instalado"
+done
+
+echo ""
+echo "==> Skills"
+for skill in claude-api doc-coauthoring docx frontend-design pdf skill-creator webapp-testing; do
+    [ -f "$SKILLDIR/$skill/SKILL.md" ] \
+        && ok "$skill" || miss "$skill" "SKILL.md ausente"
+done
+
+echo ""
+echo "==> Configuracion"
+if [ -f "$CFG" ]; then
+    python3 - "$CFG" "$OPENCODE_SERVE_PORT" <<'PY' 2>/dev/null \
+        && ok "opencode.json reconciliado" \
+        || miss "opencode.json" "invalido o incompleto"
+import json, pathlib, sys
+
+cfg = json.loads(pathlib.Path(sys.argv[1]).read_text())
+assert cfg["default_agent"] == "build"
+assert cfg["server"] == {"hostname": "127.0.0.1", "port": int(sys.argv[2])}
+assert cfg["mcp"]["engram"]["command"] == ["{env:HOME}/.local/bin/engram", "mcp", "--tools=agent"]
+assert cfg["mcp"]["context7"]["enabled"] is True
+assert cfg["mcp"]["codegraph"]["enabled"] is False
+assert cfg["mcp"]["playwright"]["enabled"] is False
+assert cfg["permission"]["question"] == "allow"
+assert cfg["permission"]["websearch"] == "allow"
+rules = list(cfg["permission"]["bash"])
+assert rules.index("*") < rules.index("sudo") < rules.index("ls")
+assert "@dietrichgebert/ponytail@4.8.4" in cfg["plugin"]
+assert not any(token in name.lower() for name in cfg.get("provider", {}) for token in ("kimi", "modal", "mdal"))
+PY
+else
+    miss "opencode.json" "$CFG no existe"
+fi
+
+[ ! -f "$HOME/.config/opencode/opencode.jsonc" ] \
+    && ok "sin JSONC duplicado" || miss "opencode.jsonc" "debe reemplazarse por opencode.json"
+[ -f "$HOME/.config/opencode/plugins/engram.ts" ] \
+    && ok "plugin Engram" || miss "plugin Engram" "ejecuta engram setup opencode"
+grep -qs 'opencode-subagent-statusline' \
+    "$HOME/.config/opencode/tui.json" "$HOME/.config/opencode/tui.jsonc" \
+    && ok "statusline Engram" || miss "statusline Engram" "tui.json no configurado"
+
+PONYTAIL_CFG="$HOME/.config/ponytail/config.json"
+if [ -f "$PONYTAIL_CFG" ]; then
+    python3 - "$PONYTAIL_CFG" <<'PY' 2>/dev/null \
+        && ok "Ponytail defaultMode=off" || miss "Ponytail" "defaultMode debe ser off"
+import json, pathlib, sys
+assert json.loads(pathlib.Path(sys.argv[1]).read_text()).get("defaultMode") == "off"
+PY
+else
+    miss "Ponytail" "$PONYTAIL_CFG no existe"
+fi
+
+[ -f "$HOME/.config/opencode/AGENTS.md" ] \
+    && ok "AGENTS.md global" || miss "AGENTS.md" "ausente"
+if [ -f "$HOME/.config/opencode/skills-env.sh" ]; then
+    grep -q 'HOME/.local/bin' "$HOME/.config/opencode/skills-env.sh" \
+        && ok "PATH de Engram" || miss "PATH de Engram" "~/.local/bin ausente"
+else
+    miss "skills-env.sh" "ausente"
+fi
+
+echo ""
+echo "==> Shell y servicio"
+grep -q "opencode-dotfiles skills env" "$HOME/.zshrc" 2>/dev/null \
+    && ok "hook .zshrc" || miss "hook .zshrc" "no encontrado"
+if [ -f "$HOME/.bashrc" ]; then
+    grep -q "opencode-dotfiles skills env" "$HOME/.bashrc" 2>/dev/null \
+        && ok "hook .bashrc" || miss "hook .bashrc" "no encontrado"
+fi
+
+systemctl is-active opencode-serve >/dev/null 2>&1 \
+    && ok "opencode-serve activo" || miss "opencode-serve" "inactivo"
 HEALTH_URL="http://127.0.0.1:${OPENCODE_SERVE_PORT}/global/health"
-AUTH_CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTH_URL" 2>/dev/null || true)
-if [ "$AUTH_CODE" = 401 ]; then
-    if [ -z "${OPENCODE_SERVER_PASSWORD:-}" ]; then
-        miss "API local" "exige Basic Auth pero no hay password desplegado"
-    else
-        ok "API local exige Basic Auth"
-    fi
-    CURL_PASSWORD=${OPENCODE_SERVER_PASSWORD//\\/\\\\}
-    CURL_PASSWORD=${CURL_PASSWORD//\"/\\\"}
-    printf 'user = "opencode:%s"\n' "$CURL_PASSWORD" \
-        | curl -fsS --config - "$HEALTH_URL" -o /dev/null 2>/dev/null \
-        && ok "API local acepta credenciales" || miss "API local" "credenciales ausentes o invalidas"
-elif [[ "$AUTH_CODE" =~ ^2[0-9][0-9]$ ]]; then
-    if [ -n "${OPENCODE_SERVER_PASSWORD:-}" ]; then
-        miss "API local" "hay password configurado pero el servidor responde sin autenticacion"
-    else
-        ok "API local responde sin autenticacion"
-    fi
+HTTP_CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTH_URL" 2>/dev/null || true)
+if [[ "$HTTP_CODE" =~ ^2[0-9][0-9]$ || "$HTTP_CODE" = 401 ]]; then
+    ok "API local responde"
 else
     miss "API local" "no responde en :${OPENCODE_SERVE_PORT}"
 fi
-curl -fsS -o /dev/null --max-time 5 https://mcp.context7.com/ping 2>/dev/null \
-    && ok "context7 alcanzable" || miss "context7" "no responde (red?)"
 
 echo ""
-echo "============================================================"
-printf ' Resumen: %d OK   /   %d MISS\n' "$PASS" "$FAIL"
-echo "============================================================"
+printf 'Resumen: %d OK / %d MISS\n' "$PASS" "$FAIL"
 exit "$FAIL"

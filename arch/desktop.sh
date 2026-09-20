@@ -51,12 +51,12 @@ else
     exit 1
 fi
 
-# --- 2) Apuntar la app al servicio 'opencode-serve' via opencode.jsonc ---
-# Metodo oficial (mismo que usa Windows): seccion "server" en
-# ~/.config/opencode/opencode.jsonc. Sin esto, la app levantaria su propio
+# --- 2) Apuntar la app al servicio 'opencode-serve' via opencode.json ---
+# Sin esta seccion, la app levantaria su propio
 # servidor local en vez de reutilizar el systemd que ya esta corriendo.
 CFG_DIR="$HOME/.config/opencode"
-CFG_FILE="$CFG_DIR/opencode.jsonc"
+CFG_FILE="$CFG_DIR/opencode.json"
+LEGACY_CFG="$CFG_DIR/opencode.jsonc"
 mkdir -p "$CFG_DIR"
 
 read -r -d '' JSON_TPL <<EOF || true
@@ -69,11 +69,9 @@ read -r -d '' JSON_TPL <<EOF || true
 }
 EOF
 
-if [ -f "$CFG_FILE" ]; then
-    BAK="$CFG_FILE.bak-$(date +%Y%m%d-%H%M%S)"
-    cp -f "$CFG_FILE" "$BAK"
-    echo "==> Ya existia $CFG_FILE; respaldado en $BAK"
-    echo "    NO se sobrescribio tu config. Si te falta la seccion 'server', anade:"
+if [ -f "$CFG_FILE" ] || [ -f "$LEGACY_CFG" ]; then
+    echo "==> Ya existe una configuracion; no se sobrescribio."
+    echo "    Si falta la seccion 'server', anade:"
     echo "      \"server\": { \"hostname\": \"127.0.0.1\", \"port\": ${OPENCODE_SERVE_PORT} }"
 else
     printf '%s\n' "$JSON_TPL" > "$CFG_FILE"
@@ -92,30 +90,9 @@ if [ -n "${OPENCODE_PORT:-}" ]; then
     echo "         env -u OPENCODE_PORT opencode-desktop"
 fi
 
-# --- 4) Validacion: el opencode-serve responde? ---
-echo ""
-echo "==> Validando conexion con 127.0.0.1:${OPENCODE_SERVE_PORT}"
-if ss -tlnH "sport = :${OPENCODE_SERVE_PORT}" 2>/dev/null | grep -q LISTEN; then
-    echo "    OK: hay un servidor escuchando. La app deberia conectar."
-else
-    echo "    AVISO: nada escucha en :${OPENCODE_SERVE_PORT}."
-    echo "    Asegurate de que el servicio este activo:"
-    echo "      sudo systemctl enable --now opencode-serve"
-    echo "      systemctl status opencode-serve"
-fi
-
-# --- 5) Detectar el ejecutable instalado ---
-DESKTOP_BIN=""
-if command -v opencode-desktop >/dev/null 2>&1; then
-    DESKTOP_BIN="$(command -v opencode-desktop)"
-elif pacman -Q opencode-desktop-bin >/dev/null 2>&1; then
-    DESKTOP_BIN="$(pacman -Ql opencode-desktop-bin 2>/dev/null | awk '$2 ~ /^\/usr\/bin\/[^\/]+$/ {print $2; exit}')"
-fi
-
 echo ""
 echo "============================================================"
 echo " App de escritorio instalada."
-echo "   Ejecutable:    ${DESKTOP_BIN:-(buscalo en el menu de apps)}"
 echo "   Server URL:    http://localhost:${OPENCODE_SERVE_PORT}"
-echo "   (lo lee de ${CFG_FILE})"
+echo "   Config:        ${CFG_FILE}"
 echo "============================================================"

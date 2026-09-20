@@ -104,8 +104,7 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now opencode-serve.service
-sleep 2
+sudo systemctl enable opencode-serve.service
 sudo systemctl restart opencode-serve.service
 
 echo ""

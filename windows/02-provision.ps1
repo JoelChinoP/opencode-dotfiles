@@ -32,7 +32,7 @@ fi
 install -m 0644 "$templateWsl" "`$DEST/defaults.env"
 install -m 0600 "$envWsl" "`$DEST/dotfiles.env"
 sed -i '/OPENCODE_SERVER_PASSWORD/d' "`$DEST/dotfiles.env"
-cp -f "$repoWsl/wsl/"*.sh   "`$DEST/" 2>/dev/null || true
+cp -f "$repoWsl/wsl/provision.sh" "$repoWsl/wsl/opencode-serve.sh" "`$DEST/"
 rm -f "`$DEST/expose-opencode-lan-session.sh"
 find "`$DEST" -type f -exec sed -i 's/\r`$//' {} +
 chmod +x "`$DEST/"*.sh
