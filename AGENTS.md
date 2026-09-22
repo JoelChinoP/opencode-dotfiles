@@ -1,25 +1,37 @@
-# Reglas del repositorio
+# Guía de este repositorio
 
-- Responde en español; mantén los cambios pequeños y necesarios.
-- Este repositorio configura OpenCode V2 para Arch Linux y Windows.
-- Guarda las plantillas compartidas en `templates/` y lo específico de cada
-  sistema en `arch/` o `windows/`.
-- Reutiliza lo existente y las herramientas nativas antes de añadir dependencias.
-- Usa la documentación de V2: https://opencode.ai/v2/docs/config.
-- Mantén las plantillas sin credenciales ni rutas personales y verifica los cambios.
+- El perfil instalable de OpenCode V2 vive en `templates/`; el `AGENTS.md` de la
+  raíz guía este checkout, mientras `templates/AGENTS.md` se instala como regla
+  global. Lo específico de plataforma va en `arch/` o `windows/`.
+- La instalación completa está implementada solo para Arch; `windows/README.md`
+  copia manualmente `opencode.jsonc`, sin desplegar plugins ni skills.
+- Consulta la documentación de V2 al modificar configuración o plugins:
+  https://opencode.ai/v2/docs/config.
 
-## Simplicidad (Ponytail local)
+## Perfil y despliegue
 
-Este repositorio mantiene una adaptación local de Ponytail en
-`templates/plugins/ponytail/` porque el entrypoint upstream 4.10.0 usa hooks V1
-que OpenCode V2 no ejecuta. Al editar este repositorio:
+- `templates/opencode.jsonc` registra los plugins de servidor Engram y Ponytail;
+  la statusline de TUI se registra aparte en `templates/cli.json`. Herdr es
+  opcional y lo instala su integración oficial, después de desplegar el perfil;
+  una reinstalación limpia requiere volver a integrarlo.
+- Mantén la adaptación local de Ponytail: el entrypoint upstream 4.10.0 usa
+  hooks V1. Su nivel inicial es `lite` (entorno `PONYTAIL_DEFAULT_MODE` antes que
+  opción del plugin); `/ponytail` sin argumento usa `full`.
+- Deja plantillas sin credenciales ni rutas personales: `arch/install.sh` escribe
+  en el staging las rutas absolutas de Engram y skills y fuerza loopback en
+  `service.json` antes de validar y reemplazar el perfil global. El instalador
+  **reemplaza**, no fusiona, y respalda el perfil anterior y la base Engram.
+- Si modificas una skill, actualiza su `content_sha256` en
+  `templates/skills-lock.json`; Playwright CLI también tiene un lock npm en
+  `templates/tools/playwright-cli/` y usa Chromium del sistema.
 
-- Antes de editar, entiende el flujo y sus llamadores; corrige la causa raíz.
-- Implementa solo lo solicitado: reutiliza código, biblioteca estándar y funciones
-  nativas antes de añadir dependencias, abstracciones o infraestructura futura.
-- Prefiere el cambio más pequeño que funcione, sin sacrificar validación, manejo
-  de errores, seguridad ni accesibilidad. Verifica los cambios relevantes.
-- Mantén Engram, Ponytail y la statusline como adaptaciones locales verificadas.
-  Herdr se instala por su mecanismo oficial, sin duplicar su archivo administrado.
-- El nivel inicial de Ponytail es `lite` (`PONYTAIL_DEFAULT_MODE` o la opción del
-  plugin); `/ponytail` sin argumento usa `full`.
+## Verificación
+
+- `node arch/check.mjs`: plugins, permisos, modelos y hashes de skills sobre las
+  plantillas, sin red ni servicio. `python arch/check-install.py`: instalador en
+  HOME/XDG aislados con dobles de binarios; requiere Bash, Zsh y herramientas de
+  Arch. `bash arch/check-documents.sh`: smoke DOCX/PDF con Pandoc, LibreOffice y Poppler.
+- `bash arch/verify.sh` valida el perfil *instalado*, no `templates/`; usa
+  `--config-dir DIR` para un staging preparado o `--live` después de activar el
+  servicio. Para `--live`, invoca el script por ruta absoluta desde un directorio
+  sin configuración de proyecto, para no alterar las comprobaciones de MCPs.
