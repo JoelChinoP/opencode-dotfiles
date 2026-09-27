@@ -1,18 +1,18 @@
 # opencode-dotfiles-v2
 
 Perfil limpio de **OpenCode V2 para Arch Linux**, con Engram, Ponytail y la
-statusline como plugins locales. Versiones de referencia: OpenCode 2.0.8 y
+statusline como plugins locales. Versiones de referencia: OpenCode 2.0.15 y
 Engram 2.0.0.
 
 | Integración | Estado |
 | --- | --- |
 | Context7 MCP remoto | Activado; documentación solo cuando hace falta |
 | Engram MCP local | Activado; memoria crítica y contexto limitado |
-| CodeGraph MCP remoto | Desactivado por defecto |
+| CodeGraph MCP local | `codegraph serve --mcp`, desactivado por defecto |
 | Engram local V2 | Política crítica y guía de compactación |
 | Ponytail local V2 | Reglas por turno en `lite`; `/ponytail` cambia el modo |
 | subagent-statusline.v2 local | Pie y barra lateral de la TUI |
-| Herdr | Integración oficial opcional: `herdr integration install opencode` |
+| Herdr | Integración oficial automática si ya está instalado, estable >= 0.9.1 |
 | Skills documentales y diseño | `document-files` local y `frontend-design` fijada |
 | Navegador | Skill y `@playwright/cli@0.1.21` fijados; Chromium del sistema |
 | Gobernanza de skills | Catálogo permitido y mantenimiento manual no autoinvocable |
@@ -33,7 +33,8 @@ ajustes, fijando la escucha en `127.0.0.1`. El perfil se valida antes de reempla
 el anterior. No ejecuta `sudo` ni instala paquetes con pacman por ti.
 
 Para desplegar sin reiniciar el servicio: `bash arch/install.sh --no-start`.
-En esta preparación solo se instaló en un entorno temporal aislado.
+La [verificación](docs/verificacion.md) distingue las pruebas aisladas de la
+sincronización con la instalación del equipo.
 
 Tras instalar, abre una terminal Bash/Zsh nueva: `oc` abre OpenCode y
 `oc-last` retoma la última sesión; `oc --session ses_ID` abre una concreta.
@@ -43,7 +44,11 @@ directorio del proyecto. V2 ya descubre/inicia un servicio separado de la termin
 ## Permisos y contexto
 
 - Confirmaciones TUI en `prompt`; shell pide autorización salvo inspecciones Git
-  acotadas. Los comandos de test/build se autorizan por proyecto.
+  acotadas. Los comandos de test/build se autorizan por proyecto mediante
+  `permissions` o «Allow always». Cambiar el modo desde `Ctrl+P` afecta a la TUI
+  global; no hay un `autoaccept` de TUI por proyecto.
+- Preferencias TUI: tema oscuro, razonamiento oculto, contadores de tokens,
+  `prompt.editor: false` y navegación de páginas con `<leader>k` / `<leader>j`.
 - Solo se anuncian las skills integradas permitidas y las tres administradas;
   otras copias globales o de compatibilidad quedan ocultas hasta autorizarlas.
 - Se prioriza código fuente; leer dependencias y artefactos requiere confirmación.
@@ -52,8 +57,9 @@ directorio del proyecto. V2 ya descubre/inicia un servicio separado de la termin
 - Títulos: `agents.title.model` usa `opencode/big-pickle`, gratuito y disponible
   desde octubre de 2025. El catálogo lo admite, pero la prueba real con V2.0.8
   recibe HTTP 403 de Zen; véase [verificación](docs/verificacion.md).
-- Astra, Sol, Terra y Luna compactan aproximadamente a 350k (`input: 370000`,
-  buffer de 20k). Se conservan 30k recientes. Detalles y fuentes en el
+- Astra, Sol y Luna de GPT-6, incluidas sus variantes Fast, y Terra/Luna de GPT-5.6
+  compactan aproximadamente a 350k (`input: 370000`, buffer de 20k).
+  Se conservan 30k recientes. Detalles y fuentes en el
   [análisis de contexto y consumo](docs/contraste-dotfiles.md#3-modelos-y-compactación).
 
 ## Archivos

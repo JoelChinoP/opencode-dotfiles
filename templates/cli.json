@@ -8,7 +8,6 @@
     "./plugins/subagent-statusline.v2"
   ],
   "diffs": {
-    "source": "working",
     "wrap": "word"
   },
   "session": {
@@ -18,10 +17,14 @@
     "permissions": "prompt"
   },
   "debug": {
-    "turn_tokens": "true"
+    "turn_tokens": true
   },
   "prompt": {
     "editor": false
+  },
+  "keybinds": {
+    "session.page.up": "<leader>k",
+    "session.page.down": "<leader>j"
   },
   "animations": true
 }

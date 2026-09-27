@@ -115,6 +115,10 @@ for (const [action, resource, expected] of [
   ["engram_mem_capture_passive", "*", "deny"],
 ]) assert.equal(permission(action, resource), expected, `${action}: ${resource}`);
 assert.equal(cli.session.permissions, "prompt");
+assert.ok(typeof cli.debug.turn_tokens === "boolean" || cli.debug.turn_tokens === "verbose", "debug.turn_tokens debe ser boolean o verbose");
+assert.deepEqual(config.mcp.servers.codegraph, {
+  type: "local", command: ["codegraph", "serve", "--mcp"], disabled: true,
+});
 assert.equal(config.agent, undefined);
 assert.deepEqual(Object.keys(config.providers), ["openai"]);
 assert.deepEqual(config.skills, ["~/.config/opencode/skills"]);
@@ -165,7 +169,7 @@ const models = config.providers.openai.models;
 assert.equal(config.agents.title.model, "opencode/big-pickle");
 assert.deepEqual(config.compaction, { auto: true, keep: { tokens: 30000 }, buffer: 20000 });
 for (const [id, options] of Object.entries(models)) {
-  assert.match(id, /^(gpt-6-astra|gpt-5\.6-(sol|luna|terra))(-fast)?$/);
+  assert.match(id, /^(gpt-6-(astra|sol|luna)|gpt-5\.6-(luna|terra))(-fast)?$/);
   for (const [name, value] of Object.entries(options.limit)) {
     assert.ok(["context", "input", "output"].includes(name));
     assert.ok(Number.isInteger(value) && value > 0, `${id}: limit.${name}`);

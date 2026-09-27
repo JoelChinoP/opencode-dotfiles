@@ -1,5 +1,39 @@
 # Verificación del perfil Arch
 
+## Sincronización con el equipo — 27-09-2026
+
+OpenCode instalado y servicio **2.0.15**, Engram **2.0.0** y Herdr **0.9.1** con
+integración v12. Las decisiones actuales sustituyen las referencias históricas
+de este documento sobre CodeGraph remoto y el despliegue global pendiente:
+
+- TUI global en `prompt`. Las autorizaciones por proyecto se gestionan con reglas
+  `permissions` o «Allow always»; el cambio de modo desde `Ctrl+P` es global.
+- CodeGraph local (`codegraph serve --mcp`) desactivado por defecto.
+- Preferencias TUI sincronizadas: contadores de tokens con booleano `true`, tema
+  oscuro, razonamiento oculto, editor desactivado, páginas con `<leader>k` /
+  `<leader>j` y sin imponer `diffs.source`.
+- GPT-6 Astra/Sol/Luna Fast incluidos con 500k/370k/128k. La API del servicio
+  confirma esos límites efectivos; no se ha probado una inferencia de 370k.
+- El instalador integra Herdr mediante su comando oficial si encuentra una
+  versión estable >= 0.9.1. La integración ya instalada del equipo se conserva.
+
+Verificación realizada:
+
+- `node arch/check.mjs`: correcto, incluidos los IDs GPT-6 y el tipo CLI corregido.
+- `TMPDIR=/tmp/opencode python -I arch/check-install.py`: correcto en Bash/Zsh,
+  con Herdr ausente, compatible, antiguo y fallido mediante dobles. La cadena
+  inválida `turn_tokens: "true"` se rechaza antes de reemplazar el perfil.
+- `bash /ruta/al/repositorio/arch/verify.sh --live` desde `/tmp/opencode`: correcto;
+  Engram/Ponytail activos, Context7/Engram conectados, CodeGraph desactivado y las
+  cuatro skills administradas presentes con hashes válidos.
+- Comparación semántica del perfil instalado con las plantillas: coincide tras
+  resolver las rutas de Engram/skills y descontar el registro opcional de Herdr.
+- Sincronización puntual de `opencode.jsonc` y `cli.json` con respaldo previo en
+  `opencode-dotfiles-v2/backups/sync-20260927.*`; sin reinstalar el perfil completo
+  ni reiniciar el servicio.
+
+## Verificación inicial — 20-09-2026
+
 Fecha: **20-09-2026**. OpenCode `2.0.8`, paquete Arch `2.0.8-1`; Engram `2.0.0`;
 Ponytail local 4.10.0 adaptado. Pruebas en Linux x86_64 con HOME, XDG_CONFIG_HOME,
 XDG_DATA_HOME, XDG_STATE_HOME, XDG_CACHE_HOME y ENGRAM_DATA_DIR temporales.

@@ -12,8 +12,8 @@
 
 - `templates/opencode.jsonc` registra los plugins de servidor Engram y Ponytail;
   la statusline de TUI se registra aparte en `templates/cli.json`. Herdr es
-  opcional y lo instala su integración oficial, después de desplegar el perfil;
-  una reinstalación limpia requiere volver a integrarlo.
+  opcional: el instalador vuelve a ejecutar su integración oficial después de
+  desplegar el perfil cuando encuentra Herdr estable >= 0.9.1 en el PATH.
 - Mantén la adaptación local de Ponytail: el entrypoint upstream 4.10.0 usa
   hooks V1. Su nivel inicial es `lite` (entorno `PONYTAIL_DEFAULT_MODE` antes que
   opción del plugin); `/ponytail` sin argumento usa `full`.

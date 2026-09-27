@@ -3,6 +3,11 @@
 Fecha: **20 de septiembre de 2026**. Alcance: preparar este repositorio y probarlo
 en un HOME/XDG aislado. La configuración global del usuario no se ha aplicado.
 
+**Actualización 27-09-2026:** el perfil se sincroniza con el equipo con TUI en
+`prompt`, CodeGraph **local desactivado**, variantes GPT-6 Fast y Herdr oficial
+condicionado a un binario compatible instalado. Las decisiones históricas sobre
+CodeGraph remoto quedan sustituidas; véase [verificación](verificacion.md).
+
 ## Correcciones al informe de entrada
 
 El [informe original](oc-search-config.md) es útil como hipótesis, pero sus marcas

@@ -240,8 +240,10 @@ además de Sol/Terra/Luna, aceptando el consumo asociado:
 de salida sin anunciar una ventana innecesariamente grande.
 
 Son presupuestos operativos elegidos, no un óptimo medido. Los IDs `-fast` son
-entradas independientes: Astra Fast y Sol Fast mantienen su catálogo, porque
-el usuario los retiró de la plantilla. La fuente de configuración es
+entradas independientes. Desde la sincronización del 27-09-2026, GPT-6 Astra Fast,
+Sol Fast y Luna Fast tienen también el presupuesto 500k/370k/128k de la tabla.
+Esto sustituye la decisión anterior de dejar Astra Fast y Sol Fast sin override.
+La fuente de configuración es
 [`templates/opencode.jsonc`](../templates/opencode.jsonc), con estos ajustes:
 
 ```json

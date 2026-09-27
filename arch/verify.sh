@@ -19,7 +19,7 @@ servers = config["mcp"]["servers"]
 assert set(servers) == {"context7", "engram", "codegraph"}
 assert not servers["context7"].get("disabled")
 assert not servers["engram"].get("disabled")
-assert servers["codegraph"]["disabled"] is True
+assert servers["codegraph"] == {"type": "local", "command": ["codegraph", "serve", "--mcp"], "disabled": True}
 assert "agent" not in config
 assert config["default_agent"] == "build"
 assert config["tool_output"]["max_bytes"] == 32768
@@ -46,6 +46,8 @@ for name in ("engram", "ponytail"):
     assert (plugin / manifest["exports"]["."]).is_file(), name
 cli = json.loads((root / "cli.json").read_text())
 assert cli["session"]["permissions"] == "prompt"
+turn_tokens = cli.get("debug", {}).get("turn_tokens", False)
+assert isinstance(turn_tokens, bool) or turn_tokens == "verbose", "debug.turn_tokens debe ser boolean o verbose"
 assert json.loads((root / "service.json").read_text())["hostname"] == "127.0.0.1"
 assert "./plugins/subagent-statusline.v2" in cli["plugins"]
 statusline = root / "plugins/subagent-statusline.v2"

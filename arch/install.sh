@@ -223,6 +223,24 @@ else
   echo 'Atajos automáticos disponibles para Bash/Zsh. En tu shell: oc → opencode; oc-last → opencode --continue.'
 fi
 
+# Herdr administra su integración; solo registrarla cuando el binario soporte V2.
+if command -v herdr >/dev/null; then
+  herdr_version="$(herdr --version)"
+  if python -I - "$herdr_version" <<'PY'
+import re, sys
+version = re.fullmatch(r"herdr (\d+)\.(\d+)\.(\d+)", sys.argv[1].strip())
+sys.exit(0 if version and tuple(map(int, version.groups())) >= (0, 9, 1) else 1)
+PY
+  then
+    if ! herdr integration install opencode; then
+      echo 'Perfil desplegado; falló la integración opcional de Herdr. Revisa herdr integration status y vuelve a instalarla.' >&2
+      exit 1
+    fi
+  else
+    printf 'Herdr omitido: se requiere una versión estable >= 0.9.1; detectado %s.\n' "$herdr_version" >&2
+  fi
+fi
+
 if $start; then
   if ! timeout --kill-after=5s 60s opencode service restart; then
     echo 'Perfil desplegado; el servicio no arrancó. Revisa opencode service status y el log del servidor.' >&2

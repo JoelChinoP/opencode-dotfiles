@@ -10,7 +10,8 @@ sudo pacman -Syu --needed opencode python nodejs npm curl tar coreutils git ripg
 opencode --version
 ```
 
-Debe ser OpenCode **V2**; la versión probada es `2.0.8`. `pacman -Si opencode`
+Debe ser OpenCode **V2**; la instalación actual está verificada con `2.0.15`
+(las pruebas iniciales se hicieron con `2.0.8`). `pacman -Si opencode`
 permite comprobar la versión ofrecida por tu mirror. No se usa AUR ni paru.
 Python se usa con su biblioteca estándar y `-I`; no se activa ningún venv ni se
 instalan librerías globales. Node.js 20+ y npm instalan el runtime Playwright
@@ -79,7 +80,9 @@ El script realiza, en orden:
    administradas, respaldando y normalizando el entorno anterior.
 8. Añade `oc` y `oc-last` en Bash/Zsh sin duplicarlos al reinstalar; retira los
    aliases simples y el monitor instalados por la versión anterior.
-9. Reinicia OpenCode y comprueba plugins y MCPs, salvo con `--no-start`.
+9. Si Herdr estable >= 0.9.1 está en el PATH, ejecuta su integración oficial para
+   OpenCode sobre el perfil desplegado. Sin Herdr, continúa con el perfil base.
+10. Reinicia OpenCode y comprueba plugins y MCPs, salvo con `--no-start`.
 
 Los antiguos scripts numerados eran TODOs. Estas fases están ahora en un único
 instalador; las skills forman parte del staging verificado y no tienen un
@@ -188,10 +191,11 @@ el uso normal de la TUI por SSH.
   usa `/mcps`, selecciona Context7 e inicia sesión. No se guarda ninguna clave
   en el repositorio; la autenticación depende del servidor y sus límites.
 - Engram debe aparecer `connected`; usa `--tools=agent` (19 herramientas en 2.0.0).
-- CodeGraph debe aparecer `disabled`. Es el servicio de **codegraph.ru** descrito
-  por el informe, no uno de los otros proyectos homónimos. Su activación requiere
-  acceso a un proyecto en ese servicio: cambia `disabled` a `false`, autentica
-  desde `/mcps` y comprueba la identidad del proyecto. No se instala su plugin V1.
+- CodeGraph debe aparecer `disabled`. La entrada es local:
+  `codegraph serve --mcp`. El perfil no instala el binario ni genera índices.
+  Actívalo solo en el proyecto que lo necesite, con el ejecutable disponible y su
+  contexto preparado. Esta elección sustituye el endpoint remoto de codegraph.ru
+  usado en la preparación inicial.
 - Las reglas de Ponytail se aplican con el plugin local. El nivel inicial es
   `lite`; `/ponytail` sin argumento usa `full`, y `/ponytail lite|full|ultra|off`
   lo cambia solo en esa sesión.
@@ -207,6 +211,25 @@ el uso normal de la TUI por SSH.
 - `playwright-cli` usa perfiles en memoria por defecto. No adjuntes el navegador
   personal ni uses persistencia/estado de autenticación salvo necesidad expresa;
   cierra la sesión al terminar.
+
+### Permisos por proyecto
+
+El perfil global usa `session.permissions: prompt` en `cli.json`. `Ctrl+P` permite
+cambiar el modo de la TUI, pero ese ajuste es global, no por proyecto. Para
+autorizar una operación habitual solo en un proyecto, usa «Allow always» en su
+solicitud de permiso o declara reglas acotadas en su `opencode.jsonc`, por ejemplo:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": [
+    { "action": "shell", "resource": "npm test", "effect": "allow" }
+  ]
+}
+```
+
+El resto de comandos sigue sujeto a las reglas globales. No se añade una
+autorización general de shell a todos los proyectos.
 
 ### Ponytail y PONYTAIL_DEFAULT_MODE
 
@@ -231,8 +254,12 @@ variable de entorno sí la anula en esos agentes.
 
 ### Herdr opcional
 
-Si usas Herdr, instala su integración oficial (requiere Herdr 0.9.1 o posterior)
-**después de desplegar el perfil**:
+Herdr es opcional. Si su binario estable 0.9.1 o posterior ya está en el PATH,
+`arch/install.sh` instala de nuevo su integración oficial **después de desplegar
+el perfil**, también con `--no-start`. Si está ausente o es anterior, el perfil
+base se instala sin registrar Herdr. El script no descarga ni actualiza Herdr.
+
+Para integrar manualmente o comprobar su estado:
 
 ```sh
 herdr integration install opencode
@@ -240,9 +267,10 @@ herdr integration status
 ```
 
 Reabre la TUI de OpenCode después de instalar. Herdr administra sus archivos y el
-registro de plugins de TUI; este repositorio no mantiene una copia modificada. Si
-reinstalas el perfil limpio, vuelve a ejecutar ese comando. Tras actualizar Herdr,
-reinstala la integración para recoger sus cambios. Consulta la
+registro de plugins de TUI; este repositorio no mantiene una copia modificada.
+Si su integración falla, el instalador informa del error y conserva el perfil
+desplegado y su respaldo. Tras actualizar Herdr, reinstala la integración para
+recoger sus cambios. Consulta la
 [documentación oficial](https://herdr.dev/docs/integrations/#opencode).
 
 La versión local anterior, Herdr **0.8.2**, instalaba la integración V1
@@ -268,8 +296,9 @@ bash arch/verify.sh --live
 temporales, con dobles de OpenCode/Engram: no descarga binarios ni arranca servicios.
 Comprueba respaldo del rc, symlinks, reinstalación, argumentos y códigos de salida
 de los atajos, skills, wrapper Playwright, retirada de aliases/binario anteriores,
-loopback y Ponytail. También inyecta una
-plantilla inválida y un fallo de intercambio para comprobar que el perfil previo
+loopback y Ponytail. Comprueba Herdr ausente, compatible, antiguo y con fallo de
+integración mediante un doble. También inyecta JSON inválido, un tipo CLI
+incorrecto y un fallo de intercambio para comprobar que el perfil previo
 se conserva/restaura. Requiere ambas shells y las dependencias del instalador en Arch.
 
 `check-documents.sh` crea un DOCX desde Markdown, prueba el contenedor y su

@@ -42,7 +42,35 @@ else:
     sys.exit(7)
 ''')
         opencode.chmod(0o755)
-        env["PATH"] = str(binaries) + os.pathsep + env["PATH"]
+        # Nunca invocar el Herdr real del equipo: Bash prueba ausencia y Zsh un doble.
+        env["PATH"] = os.pathsep.join([str(binaries), *(
+            entry for entry in env["PATH"].split(os.pathsep)
+            if entry and not (Path(entry) / "herdr").exists()
+        )])
+        if shell == "zsh":
+            herdr = binaries / "herdr"
+            herdr.write_text('''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+if sys.argv[1:] == ["--version"]:
+    print("herdr " + os.environ.get("OC_TEST_HERDR_VERSION", "0.9.1"))
+    sys.exit(0)
+assert sys.argv[1:] == ["integration", "install", "opencode"]
+if os.environ.get("OC_TEST_HERDR_FAIL") == "1":
+    sys.exit(1)
+root = Path(os.environ["XDG_CONFIG_HOME"]) / "opencode"
+cli = json.loads((root / "cli.json").read_text())
+assert cli["session"]["permissions"] == "prompt"
+assert "./plugins/subagent-statusline.v2" in cli["plugins"]
+assert (root / "plugins/engram/index.js").is_file()
+cli["plugins"].append("./herdr-opencode")
+(root / "herdr-opencode").mkdir(exist_ok=True)
+(root / "herdr-opencode/tui.js").write_text("// Herdr simulado\\n")
+(root / "cli.json").write_text(json.dumps(cli))
+with (Path.home() / "herdr-calls").open("a") as stream:
+    stream.write("opencode\\n")
+''')
+            herdr.chmod(0o755)
         # Probar también la recuperación si falla el segundo rename del perfil.
         real_mv = shutil.which("mv")
         move = binaries / "mv"
@@ -91,7 +119,7 @@ exec "{real_mv}" "$@"
         (config_dir / "previous-profile").write_text("conservar")
         (config_dir / "service.json").write_text(json.dumps({"hostname": "0.0.0.0", "port": 4197}))
         previous = ""
-        for _ in range(2):
+        for installation in range(2):
             before = target.read_text()
             backups = set((install_dir / "backups").glob("install.*"))
             subprocess.run(
@@ -113,6 +141,13 @@ exec "{real_mv}" "$@"
             assert ("OTHER_MODE=conservar" if shell == "bash" else "# conservar comentario") in env_file.read_text()
             service = json.loads((config_dir / "service.json").read_text())
             assert service == {"hostname": "127.0.0.1", "port": 4197}
+            cli = json.loads((config_dir / "cli.json").read_text())
+            assert cli["session"]["permissions"] == "prompt"
+            assert cli["debug"]["turn_tokens"] is True
+            assert cli["plugins"] == ["./plugins/subagent-statusline.v2"] + (["./herdr-opencode"] if shell == "zsh" else [])
+            if shell == "zsh":
+                assert (config_dir / "herdr-opencode/tui.js").is_file()
+                assert len((home / "herdr-calls").read_text().splitlines()) == installation + 1
             assert {path.name for path in (config_dir / "skills").iterdir() if path.is_dir()} == {
                 "document-files", "frontend-design", "playwright-cli", "skill-governance"
             }
@@ -159,17 +194,32 @@ exec "{real_mv}" "$@"
         assert snapshot == {str(p.relative_to(config_dir)): p.read_bytes() for p in config_dir.rglob("*") if p.is_file()}
         assert target.read_text() == before
 
-        # Una plantilla inválida falla antes de crear respaldos o tocar el perfil/rc.
+        # JSON inválido y un tipo CLI incorrecto fallan antes de tocar perfil/rc.
         broken = home / "broken repo"
         shutil.copytree(root / "arch", broken / "arch")
         shutil.copytree(root / "templates", broken / "templates")
-        (broken / "templates/cli.json").write_text("{ JSON inválido")
-        backups = set((install_dir / "backups").iterdir())
-        result = subprocess.run(["bash", str(broken / "arch/install.sh"), "--no-start"],
-                                env=env | {"PYTHONOPTIMIZE": "1"}, cwd=home, capture_output=True, text=True)
-        assert result.returncode != 0
-        assert backups == set((install_dir / "backups").iterdir())
-        assert snapshot == {str(p.relative_to(config_dir)): p.read_bytes() for p in config_dir.rglob("*") if p.is_file()}
-        assert target.read_text() == before
+        invalid_cli = json.loads((root / "templates/cli.json").read_text())
+        invalid_cli["debug"]["turn_tokens"] = "true"
+        for content in ("{ JSON inválido", json.dumps(invalid_cli)):
+            (broken / "templates/cli.json").write_text(content)
+            backups = set((install_dir / "backups").iterdir())
+            result = subprocess.run(["bash", str(broken / "arch/install.sh"), "--no-start"],
+                                    env=env | {"PYTHONOPTIMIZE": "1"}, cwd=home, capture_output=True, text=True)
+            assert result.returncode != 0
+            assert backups == set((install_dir / "backups").iterdir())
+            assert snapshot == {str(p.relative_to(config_dir)): p.read_bytes() for p in config_dir.rglob("*") if p.is_file()}
+            assert target.read_text() == before
 
-print("OK: skills y Playwright fijados, oc/oc-last, respaldos, loopback, Ponytail lite, prevalidación y restauración.")
+        if shell == "zsh":
+            result = subprocess.run(["bash", str(root / "arch/install.sh"), "--no-start"],
+                                    env=env | {"OC_TEST_HERDR_VERSION": "0.8.2"}, cwd=home, check=True, capture_output=True, text=True)
+            assert "Herdr omitido" in result.stderr
+            assert not (config_dir / "herdr-opencode").exists()
+            assert len((home / "herdr-calls").read_text().splitlines()) == 2
+            result = subprocess.run(["bash", str(root / "arch/install.sh"), "--no-start"],
+                                    env=env | {"OC_TEST_HERDR_FAIL": "1"}, cwd=home, capture_output=True, text=True)
+            assert result.returncode != 0
+            assert "falló la integración opcional de Herdr" in result.stderr
+            subprocess.run(["bash", str(root / "arch/verify.sh")], env=env, cwd=home, check=True, capture_output=True, text=True)
+
+print("OK: skills y Playwright fijados, oc/oc-last, respaldos, loopback, Ponytail lite, Herdr opcional, prevalidación y restauración.")

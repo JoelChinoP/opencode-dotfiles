@@ -64,7 +64,7 @@ a942e73ab424faaa6e2785d1563e0d9d7f20739944dae0c50071223301d44333  engram_2.0.0_l
 | Herdr | [Instalación oficial](https://herdr.dev/docs/integrations/#opencode): `herdr integration install opencode`, soporte V2 y registro de la TUI en `cli.json`; sustituye la adaptación propia |
 | subagent-statusline.v2 | Adaptación local restaurada desde la versión de la máquina (estado `done`, `MAX_ROWS`); consolidada en `templates/plugins/` y registrada en `cli.json` como plugin de TUI |
 | CodeGraph del informe | [Adaptador OpenCode](https://codegraph.ru/docs/en/integrations/OPENCODE_PLUGIN.html), todavía con hooks V1; no instalado |
-| CodeGraph MCP | [Autenticación remota oficial](https://codegraph.ru/docs/en/integrations/REMOTE_MCP_AUTH.html); endpoint `https://api.codegraph.ru/agent-plugin/mcp` y OAuth por proyecto |
+| CodeGraph MCP histórico | [Autenticación remota oficial](https://codegraph.ru/docs/en/integrations/REMOTE_MCP_AUTH.html); endpoint usado en la preparación inicial, sustituido el 27-09-2026 por la entrada local desactivada `codegraph serve --mcp` elegida por el usuario |
 
 Engram, Ponytail y statusline se distribuyen como adaptaciones locales y no se
 actualizan mediante npm. Engram no sustituye todas las funciones del plugin
