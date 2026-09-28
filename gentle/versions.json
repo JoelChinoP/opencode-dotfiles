@@ -1,0 +1,10 @@
+{
+  "pi": "0.87.1",
+  "gentle_shell": "3.7.0",
+  "gentle_ai": "3.7.0",
+  "engram": "2.2.1",
+  "engram_sha256": {
+    "x86_64": "5094bbe764f4c775bb17ce7ac53931323ca184a1f57e88d458aaa4c4d6e6a85a",
+    "aarch64": "a23952a114f3f6cfb4e9714d84f1f489b627694d18890e2cf9ce17b81df4d6e1"
+  }
+}
