@@ -12,6 +12,7 @@ web pueden cambiar independientemente.
 - [Referencia de settings](https://github.com/earendil-works/pi/blob/v0.87.1/packages/coding-agent/docs/settings.md).
 - [Modelos y OAuth](https://github.com/earendil-works/pi/blob/v0.87.1/packages/coding-agent/docs/models.md).
 - [CLI y reanudación](https://github.com/earendil-works/pi/blob/v0.87.1/packages/coding-agent/docs/cli.md).
+- [Carga de recursos y diagnóstico de colisiones](https://github.com/earendil-works/pi/blob/v0.87.1/packages/coding-agent/src/core/resource-loader.ts).
 - [Compactación](https://github.com/earendil-works/pi/blob/v0.87.1/packages/coding-agent/docs/compaction.md).
 - [Confianza y permisos](https://github.com/earendil-works/pi/blob/v0.87.1/packages/coding-agent/docs/security.md).
 - [Proveedor Codex](https://github.com/earendil-works/pi/blob/v0.87.1/packages/ai/src/providers/openai-codex.ts).
@@ -51,6 +52,11 @@ posterior todavía no publicado con ese pin.
 - [Integración Pi y límites del home aislado](https://github.com/Gentleman-Programming/gentle-ai/blob/v3.7.0/docs/pi.md).
 - [Adaptador Pi: paquetes y PI_CODING_AGENT_DIR](https://github.com/Gentleman-Programming/gentle-ai/blob/v3.7.0/internal/agents/pi/adapter.go).
 - [Routing de revisión nativa](https://github.com/Gentleman-Programming/gentle-ai/blob/v3.7.0/docs/pi-provider-routing.md).
+- [CLI review mode: RDD on por defecto y cambio global explícito](https://github.com/Gentleman-Programming/gentle-ai/blob/v3.7.0/internal/cli/review_mode.go).
+
+La comprobación real del 28 de septiembre confirmó `on (decided by default)`.
+Este contrato del runtime corrige la descripción opt-in de algunas secciones de
+Gentle Shell: el instalador local siembra `off` si no había decisión previa.
 
 ## Engram
 

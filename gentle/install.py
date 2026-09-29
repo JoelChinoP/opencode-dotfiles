@@ -13,6 +13,7 @@ import shutil
 import sqlite3
 import stat
 import subprocess
+import sys
 import tarfile
 import tempfile
 
@@ -24,6 +25,7 @@ END = "# <<< gentle-dotfiles <<<"
 AGENTS_BEGIN = "<!-- gentle-dotfiles:begin -->"
 AGENTS_END = "<!-- gentle-dotfiles:end -->"
 COMPANIONS = ("gentle-engram", "pi-mcp-adapter", "pi-web-access", "pi-btw")
+PROFILE_RENAMES = {"diario": "daily", "rendimiento": "performance", "profundo": "deep"}
 
 
 def read_json(path):
@@ -137,7 +139,7 @@ def layout(versions):
 
 def environment(paths):
     return {
-        "GENTLE_SHELL_PI": str(paths["runtime"] / "bin/pi"),
+        "GENTLE_SHELL_PI": str(paths["data"] / "bin/pi"),
         "GENTLE_PI_AGENTS_PI": str(paths["runtime"] / "bin/pi"),
         "GENTLE_SHELL_HOME": str(paths["agent"]),
         "PI_CODING_AGENT_DIR": str(paths["agent"]),
@@ -177,7 +179,7 @@ def preflight_existing(paths):
             path = paths[key] / name
             value = read_json(path)
             if name == "profiles.json" and path.exists():
-                validate_profiles(value)
+                rename_profiles(value)
     settings = read_json(paths["agent"] / "settings.json")
     merge_defaults(settings, templates()[1])
     for name in ("gsh", "gsh-last"):
@@ -212,6 +214,8 @@ def backup(paths):
         "gsh": paths["bin"] / "gsh",
         "gsh-last": paths["bin"] / "gsh-last",
         "env.sh": paths["data"] / "env.sh",
+        "pi-compat": paths["data"] / "bin/pi",
+        "pi_compat.py": paths["data"] / "pi_compat.py",
         "installed.json": paths["data"] / "installed.json",
     }
     manifest = {}
@@ -277,6 +281,39 @@ def native_binary(paths, versions):
     return paths["runtime"] / "lib/node_modules/gentle-pi/.gentle-ai" / f"v{versions['gentle_ai']}" / "gentle-ai"
 
 
+def install_pi_compat(paths):
+    helper = paths["data"] / "pi_compat.py"
+    write_file(helper, (ROOT / "pi_compat.py").read_text())
+    command = shlex.join([
+        sys.executable, "-I", str(helper), str(paths["runtime"] / "bin/pi"),
+        str(paths["runtime"] / "lib/node_modules/gentle-pi"),
+    ])
+    write_file(paths["data"] / "bin/pi", f'''#!/bin/sh
+{LAUNCHER_MARKER}
+set -eu
+exec {command} "$@"
+''', 0o755)
+
+
+def configure_review_mode(paths, versions, env):
+    command = [str(native_binary(paths, versions)), "review", "mode"]
+    status = json.loads(subprocess.check_output(
+        [*command, "status", "--json"], env=env, cwd=paths["data"] / "setup", text=True
+    ))["status"]
+    if status.get("schema") != "gentle-ai.rdd-mode-status/v1" or status.get("global") not in ("", "on", "off"):
+        raise ValueError("Respuesta de review mode incompatible")
+    # 3.7.0 usa on en ausencia de decisión; sembrar el opt-in elegido, una sola vez.
+    if status["global"] == "":
+        status = json.loads(subprocess.check_output(
+            [*command, "disable", "--scope", "global", "--json"],
+            env=env, cwd=paths["data"] / "setup", text=True,
+        ))["status"]
+        if status.get("global") != "off" or status.get("effective") != "off":
+            raise ValueError("No se pudo configurar RDD como optativo")
+    print(f"RDD global: {status['global']} (las decisiones explícitas previas se conservan)", flush=True)
+    return status
+
+
 def install_runtime(paths, versions, env):
     ready = all(read_json(path / "package.json").get("version") == version
                 for path, version in runtime_packages(paths, versions))
@@ -294,15 +331,30 @@ def install_runtime(paths, versions, env):
             raise ValueError(f"Versión inesperada: {path}")
 
 
+def rename_profiles(store):
+    validate_profiles(store)
+    profiles = dict(store["profiles"])
+    for old, new in PROFILE_RENAMES.items():
+        if old not in profiles:
+            continue
+        if new in profiles and profiles[new] != profiles[old]:
+            raise ValueError(f"Los perfiles {old} y {new} difieren; resuelve el conflicto antes de renombrarlos")
+        profiles[new] = profiles.pop(old)
+    result = {**store, "profiles": profiles}
+    if store.get("active") in PROFILE_RENAMES:
+        result["active"] = PROFILE_RENAMES[store["active"]]
+    return result
+
+
 def configure(paths, settings_template, profiles_template):
     path = paths["config"] / "profiles.json"
-    profiles = read_json(path) if path.exists() else profiles_template
+    profiles = rename_profiles(read_json(path)) if path.exists() else profiles_template
     if path.exists():
         profiles["profiles"] = dict(profiles["profiles"])
         for name, roles in profiles_template["profiles"].items():
             profiles["profiles"].setdefault(name, roles)
     validate_profiles(profiles)
-    active = profiles.get("active") or "diario"
+    active = profiles.get("active") or "daily"
     selected = profiles["profiles"][active]
     settings_defaults = dict(settings_template)
     if selected.get("orchestrator", {}).get("model"):
@@ -376,6 +428,7 @@ def verify_installed(paths, versions):
         if read_json(path / "package.json").get("version") != version:
             raise ValueError(f"Versión instalada inesperada: {path}")
     for path in (paths["runtime"] / "bin/pi", paths["runtime"] / "bin/gentle-shell",
+                 paths["data"] / "bin/pi",
                  native_binary(paths, versions), Path(environment(paths)["ENGRAM_BIN"])):
         if not os.access(path, os.X_OK):
             raise ValueError(f"Falta ejecutable: {path}")
@@ -424,16 +477,20 @@ def main():
     env = child_environment(paths)
     install_engram(paths, versions, env)
     install_runtime(paths, versions, env)
+    install_pi_compat(paths)
     # cwd sin configuración de proyecto: el setup pertenece al perfil global.
     setup_dir = paths["data"] / "setup"
     setup_dir.mkdir(exist_ok=True)
     subprocess.run([paths["runtime"] / "bin/gentle-shell", "--isolated", "setup"],
                    check=True, env=env, cwd=setup_dir)
+    review_mode = configure_review_mode(paths, versions, env)
     configure(paths, settings, profiles)
     companions = verify_installed(paths, versions)
     install_launchers(paths)
     write_json(paths["data"] / "installed.json", {
         "versions": versions, "companions": companions, "backup": str(backup_path),
+        "review_mode": review_mode,
+        "pi_compat": "deduplicate-gentle-resource-arguments-v1",
         "paths": {key: str(value) for key, value in paths.items()},
     })
     print("Perfil preparado. Abre una terminal nueva y, desde tu proyecto, ejecuta gsh.")

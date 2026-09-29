@@ -1,9 +1,9 @@
 {
   "kind": "gentle-pi.agent_model_profiles",
   "version": 1,
-  "active": "diario",
+  "active": "daily",
   "profiles": {
-    "diario": {
+    "daily": {
       "orchestrator": { "model": "openai-codex/gpt-6-sol", "thinking": "high" },
       "gentle-ai-explore": { "model": "openai-codex/gpt-6-luna", "thinking": "medium" },
       "gentle-ai-worker": { "model": "openai-codex/gpt-6-sol", "thinking": "high" },
@@ -31,7 +31,7 @@
       "jd-judge-b": { "model": "openai-codex/gpt-6-sol", "thinking": "xhigh" },
       "jd-fix-agent": { "model": "openai-codex/gpt-6-sol", "thinking": "high" }
     },
-    "rendimiento": {
+    "performance": {
       "orchestrator": { "model": "openai-codex/gpt-6-astra", "thinking": "high" },
       "gentle-ai-explore": { "model": "openai-codex/gpt-6-luna", "thinking": "high" },
       "gentle-ai-worker": { "model": "openai-codex/gpt-6-sol", "thinking": "xhigh" },
@@ -59,7 +59,7 @@
       "jd-judge-b": { "model": "openai-codex/gpt-6-astra", "thinking": "xhigh" },
       "jd-fix-agent": { "model": "openai-codex/gpt-6-sol", "thinking": "xhigh" }
     },
-    "profundo": {
+    "deep": {
       "orchestrator": { "model": "openai-codex/gpt-6-astra", "thinking": "xhigh" },
       "gentle-ai-explore": { "model": "openai-codex/gpt-6-sol", "thinking": "high" },
       "gentle-ai-worker": { "model": "openai-codex/gpt-6-astra", "thinking": "high" },

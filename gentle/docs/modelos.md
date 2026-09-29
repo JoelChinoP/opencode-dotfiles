@@ -2,12 +2,12 @@
 
 ## Objetivo de cada perfil
 
-- **`diario`**: perfil inicial. Sol coordina e implementa; Luna explora con
+- **`daily`**: perfil inicial. Sol coordina e implementa; Luna explora con
   `medium`. Diseño y revisión usan Sol `xhigh`.
-- **`rendimiento`**: Astra coordina y evalúa; Sol **`xhigh`** implementa, como se
+- **`performance`**: Astra coordina y evalúa; Sol **`xhigh`** implementa, como se
   eligió expresamente. Luna explora con `high`. Prima la capacidad en puntos
   importantes sin usar Astra para toda edición.
-- **`profundo`**: Astra también implementa, coordina con `xhigh` y reserva `max`
+- **`deep`**: Astra también implementa, coordina con `xhigh` y reserva `max`
   para especificación, diseño, verificación y revisión. Sol explora con `high`.
 
 Estos perfiles son decisiones iniciales, no benchmarks. Más razonamiento no
@@ -18,7 +18,7 @@ garantiza mejores resultados para toda tarea y puede aumentar latencia y cuota.
 Todos los modelos pertenecen a **`openai-codex`**. Sol, Luna y Astra corresponden
 a `gpt-6-sol`, `gpt-6-luna` y `gpt-6-astra`.
 
-| Roles | Diario | Rendimiento | Profundo |
+| Roles | Daily | Performance | Deep |
 | --- | --- | --- | --- |
 | `orchestrator` | Sol high | Astra high | Astra xhigh |
 | `gentle-ai-explore` | Luna medium | Luna high | Sol high |
@@ -33,7 +33,7 @@ a `gpt-6-sol`, `gpt-6-luna` y `gpt-6-astra`.
 | `review-readability`, `review-reliability`, `review-resilience`, `review-risk` | Sol xhigh | Astra xhigh | Astra max |
 | `review-refuter`, `review-validator`, `jd-judge-a`, `jd-judge-b` | Sol xhigh | Astra xhigh | Astra max |
 
-Estado y archivo se mantienen en Luna `medium`, incluso en profundo: son roles
+Estado y archivo se mantienen en Luna `medium`, incluso en `deep`: son roles
 administrativos, no exploración compleja. Separar estos roles evita elevar todo
 el flujo a `max`. Los roles SDD y RDD configurados permanecen disponibles para
 cuando actives esos flujos; el catálogo no los lanza por sí mismo.
@@ -60,7 +60,7 @@ perfil inicial no dependa de una reconciliación posterior. Después, los comand
 
 La plantilla no establece `modelThinkingLevels`: un esfuerzo guardado por modelo
 puede competir con el esfuerzo del orquestador de un perfil. Mantener el esfuerzo
-en cada rol hace explícito qué selecciona `diario`, `rendimiento` o `profundo`.
+en cada rol hace explícito qué selecciona `daily`, `performance` o `deep`.
 
 ## Cambiar y guardar
 
@@ -85,7 +85,7 @@ En 3.7.0 puede existir un lanzamiento de retraso al reconciliar hijos tras un
 cambio de perfil. También puede haber overrides de proyecto y frontmatter de
 agentes. La configuración global no demuestra por sí sola el routing efectivo.
 
-`gsh-last` restaura el modelo registrado en la conversación. No fuerza `diario`
+`gsh-last` restaura el modelo registrado en la conversación. No fuerza `daily`
 al reanudar una sesión que trabajaba con otro modelo.
 
 ## Contexto y transporte

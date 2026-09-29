@@ -51,6 +51,23 @@ else:
 '''
 
 
+FAKE_NATIVE = '''import json, sys
+from pathlib import Path
+args = sys.argv[1:]
+if len(args) >= 3 and args[:2] == ["review", "mode"]:
+    path = Path.home() / ".gentle-ai/test-review-mode.json"
+    mode = json.loads(path.read_text())["mode"] if path.exists() else ""
+    if args[2] == "disable":
+        mode = "off"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"mode":mode}))
+    print(json.dumps({"status": {"schema":"gentle-ai.rdd-mode-status/v1", "global":mode,
+                                "effective":mode or "on", "source":"global" if mode else "default"}}))
+else:
+    print("gentle-ai 3.7.0")
+'''
+
+
 def executable(path, code):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"#!{sys.executable}\n" + code)
@@ -95,7 +112,7 @@ for name, content in {{"pi": 'print("0.87.1")\\n', "gentle-shell": {FAKE_LAUNCHE
     path.chmod(0o755)
 native = root / "lib/node_modules/gentle-pi/.gentle-ai/v3.7.0/gentle-ai"
 native.parent.mkdir(parents=True, exist_ok=True)
-native.write_text('#!/bin/sh\\necho "gentle-ai 3.7.0"\\n')
+native.write_text({f'#!{sys.executable}\n'!r} + {FAKE_NATIVE!r})
 native.chmod(0o755)
 ''')
         executable(self.fake_bin / "curl", '''import os, shutil, sys
@@ -146,6 +163,7 @@ shutil.copyfile(os.environ["TEST_ARCHIVE"], args[args.index("--output") + 1])
                 self.assertEqual(subagents["model_profiles"]["gentle-ai-explore"]["thinking"], "medium")
                 self.assertEqual(install.read_json(self.paths["config"] / "background-subagents.json")["policy"], "on")
                 self.assertEqual(install.read_json(self.paths["config"] / "animations.json")["policy"], "performance")
+                self.assertEqual(install.read_json(self.paths["data"] / "installed.json")["review_mode"]["global"], "off")
                 for invocation, expected in (
                     ('gsh "mensaje con espacios"', ["--isolated", "mensaje con espacios"]),
                     ('gsh-last "continuación"', ["--isolated", "--continue", "continuación"]),
@@ -162,6 +180,7 @@ shutil.copyfile(os.environ["TEST_ARCHIVE"], args[args.index("--output") + 1])
                     self.assertEqual(payload["env"]["PI_CODING_AGENT_DIR"], str(self.paths["agent"]))
                     self.assertEqual(payload["env"]["GENTLE_PI_CONFIG_HOME"], str(self.paths["config"]))
                     self.assertEqual(payload["env"]["GENTLE_PI_AGENTS_PI"], str(self.paths["runtime"] / "bin/pi"))
+                    self.assertEqual(payload["env"]["GENTLE_SHELL_PI"], str(self.paths["data"] / "bin/pi"))
                     self.assertEqual(payload["env"]["ENGRAM_DATA_DIR"], str(self.paths["memory"]))
                     self.assertEqual(payload["env"]["ENGRAM_PORT"], "7438")
                     self.assertIsNone(payload["env"]["ENGRAM_URL"])
@@ -172,8 +191,8 @@ shutil.copyfile(os.environ["TEST_ARCHIVE"], args[args.index("--output") + 1])
     def test_reinstall_preserves_selected_profile_and_manual_overrides(self):
         self.run_install()
         store = copy.deepcopy(self.profiles)
-        store["active"] = "profundo"
-        store["profiles"]["profundo"]["gentle-ai-worker"]["thinking"] = "xhigh"
+        store["active"] = "deep"
+        store["profiles"]["deep"]["gentle-ai-worker"]["thinking"] = "xhigh"
         install.write_json(self.paths["config"] / "profiles.json", store)
         install.write_json(self.paths["config"] / "models.json", {"personal": {"thinking": "low"}})
         install.write_json(self.paths["agent"] / "subagents.json", {"max_concurrency": 3, "model_profiles": {}})
@@ -185,6 +204,52 @@ shutil.copyfile(os.environ["TEST_ARCHIVE"], args[args.index("--output") + 1])
         self.assertEqual(install.read_json(self.paths["config"] / "models.json"), {"personal": {"thinking": "low"}})
         self.assertEqual(install.read_json(self.paths["agent"] / "subagents.json")["model_profiles"], {})
         self.assertEqual(install.read_json(self.paths["agent"] / "settings.json"), settings)
+
+    def test_explicit_rdd_choice_survives_install(self):
+        path = self.home / ".gentle-ai/test-review-mode.json"
+        install.write_json(path, {"mode": "on"})
+        self.run_install()
+        self.assertEqual(install.read_json(path), {"mode": "on"})
+        self.assertEqual(install.read_json(self.paths["data"] / "installed.json")["review_mode"]["global"], "on")
+
+    def test_profile_rename_preserves_customization_and_active_choice(self):
+        self.run_install()
+        store = copy.deepcopy(self.profiles)
+        inverse = {new: old for old, new in install.PROFILE_RENAMES.items()}
+        store["profiles"] = {inverse[name]: roles for name, roles in store["profiles"].items()}
+        store["active"] = "profundo"
+        store["profiles"]["profundo"]["gentle-ai-worker"]["thinking"] = "xhigh"
+        install.write_json(self.paths["config"] / "profiles.json", store)
+        self.run_install()
+        actual = install.read_json(self.paths["config"] / "profiles.json")
+        self.assertEqual(actual["active"], "deep")
+        self.assertEqual(set(actual["profiles"]), {"daily", "performance", "deep"})
+        self.assertEqual(actual["profiles"]["deep"]["gentle-ai-worker"]["thinking"], "xhigh")
+
+    def test_profile_rename_refuses_conflicting_custom_profile(self):
+        store = copy.deepcopy(self.profiles)
+        store["profiles"]["diario"] = {"orchestrator": {"model": "openai-codex/gpt-5.5"}}
+        with self.assertRaisesRegex(ValueError, "difieren"):
+            install.rename_profiles(store)
+
+    def test_pi_compat_preserves_arguments_and_other_resources(self):
+        self.run_install()
+        executable(self.paths["runtime"] / "bin/pi", 'import json,sys\nprint(json.dumps(sys.argv[1:]))\n')
+        package = self.paths["runtime"] / "lib/node_modules/gentle-pi"
+        injection = ["-e", str(package), "--skill", str(package / "skills"),
+                     "--prompt-template", str(package / "prompts"), "--theme", str(package / "themes")]
+        other = ["--theme", "/otro tema.json", "--skill", "/otras skills", "--mode", "rpc"]
+        literal = ["--", "--theme", str(package / "themes")]
+        for arguments, expected in (
+            (injection + other + literal, ["-e", str(package)] + other + literal),
+            (["--theme", str(package / "themes")], ["--theme", str(package / "themes")]),
+            (["install", "npm:ejemplo"], ["install", "npm:ejemplo"]),
+            (["--continue", "mensaje con espacios"], ["--continue", "mensaje con espacios"]),
+            (["--version"], ["--version"]),
+        ):
+            result = subprocess.run([self.paths["data"] / "bin/pi", *arguments], env=self.env,
+                                    text=True, capture_output=True, check=True)
+            self.assertEqual(json.loads(result.stdout), expected)
 
     def test_invalid_json_fails_before_setup_or_backup(self):
         path = self.paths["agent"] / "settings.json"

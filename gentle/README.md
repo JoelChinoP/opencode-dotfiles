@@ -14,8 +14,8 @@ el paso 4** y se ejecuta expresamente.
 | Plataforma inicial | Arch Linux, Ryzen 7 7730U, aproximadamente 16 GB de RAM |
 | Instalación | Gentle Shell standalone con runtime npm privado |
 | Autenticación | OpenAI Codex por OAuth, con la suscripción ChatGPT |
-| Perfil inicial | `diario` |
-| Otros perfiles | `rendimiento` y `profundo` |
+| Perfil inicial | `daily` |
+| Otros perfiles | `performance` y `deep` |
 | Trabajo habitual | ODD |
 | Especificaciones formales | SDD/OpenSpec, activación explícita |
 | Revisión nativa | RDD optativo, activación explícita |
@@ -26,17 +26,18 @@ el paso 4** y se ejecuta expresamente.
 | Interfaz | Fullscreen y animaciones `performance` |
 | Complementos iniciales | Stack oficial; sin portar las skills anteriores |
 | Aprovisionamiento | Automático oficial al arrancar cuando el lanzador lo considere necesario |
+| Compatibilidad Pi/Gentle | Adaptador local para evitar argumentos de recursos duplicados |
 
 Distribución principal de modelos:
 
 | Perfil | Coordinar | Explorar | Implementar | Diseño/verificación/revisión |
 | --- | --- | --- | --- | --- |
-| `diario` | Sol `high` | Luna `medium` | Sol `high` | Sol `xhigh` |
-| `rendimiento` | Astra `high` | Luna `high` | Sol **`xhigh`** | Astra `xhigh` |
-| `profundo` | Astra `xhigh` | Sol `high` | Astra `high` | Astra `max` |
+| `daily` | Sol `high` | Luna `medium` | Sol `high` | Sol `xhigh` |
+| `performance` | Astra `high` | Luna `high` | Sol **`xhigh`** | Astra `xhigh` |
+| `deep` | Astra `xhigh` | Sol `high` | Astra `high` | Astra `max` |
 
-`rendimiento` busca mayor capacidad de coordinación y evaluación; no promete ser
-más rápido ni consumir menos que `diario`. El modo visual `performance` es un
+`performance` busca mayor capacidad de coordinación y evaluación; no promete ser
+más rápido ni consumir menos que `daily`. El modo visual `performance` es un
 ajuste independiente. Consulta [modelos y razonamiento](docs/modelos.md) para las
 26 asignaciones de cada perfil, sus límites y cómo compararlos con trabajo real.
 
@@ -59,7 +60,7 @@ Con HOME y XDG convencionales, el instalador utiliza:
 │   ├── npm/                        # complementos del setup oficial
 │   └── sessions/                   # sesiones de este perfil
 └── gentle-ai/
-    ├── profiles.json                # catálogo diario/rendimiento/profundo
+    ├── profiles.json                # catálogo daily/performance/deep
     ├── models.json                  # routing activo de roles
     ├── animations.json              # performance
     └── background-subagents.json    # on
@@ -71,6 +72,8 @@ Con HOME y XDG convencionales, el instalador utiliza:
 │   │   ├── bin/gentle-shell
 │   │   └── lib/node_modules/gentle-pi/.gentle-ai/v3.7.0/gentle-ai
 │   ├── bin/engram                   # Engram 2.2.1
+│   ├── bin/pi                       # adaptador del lanzador Gentle
+│   ├── pi_compat.py                 # filtro de rutas de recursos repetidas
 │   ├── env.sh                       # entorno común de los dos lanzadores
 │   ├── installed.json               # versiones observadas y último respaldo
 │   ├── setup/                       # cwd del aprovisionamiento
@@ -121,6 +124,13 @@ Las versiones de referencia están en [`versions.json`](versions.json):
 Gentle Shell exige Pi >= 0.85.1. El lanzador y los hijos apuntan explícitamente al
 Pi de este runtime, por lo que no eligen otra versión instalada en el PATH.
 
+El lanzador pasa por `bin/pi`, que ejecuta el mismo Pi fijado. En la pareja
+Gentle Shell 3.7.0 / Pi 0.87.1, el manifiesto del paquete ya aporta skills,
+prompts y temas. El adaptador elimina sus tres argumentos redundantes únicamente
+cuando ese mismo paquete se está cargando con `-e`; conserva otros recursos,
+subcomandos y argumentos tras `--`. Esto elimina los avisos de un prompt y tres
+temas duplicados observados en la TUI. Los hijos siguen usando el Pi fijado.
+
 ## 3. Validar y consultar el plan
 
 Desde la raíz de este repositorio:
@@ -166,10 +176,13 @@ python3 -I gentle/install.py
    exclusivamente el ejecutable y valida su versión.
 4. **Preparar Pi/Gentle.** Instala las versiones fijadas con npm en el runtime
    privado. Sus scripts de instalación preparan el Gentle AI privado firmado.
+   Despliega el adaptador local que evita recursos duplicados del lanzador.
 5. **Ejecutar setup oficial.** Llama a `gentle-shell --isolated setup` desde un
    directorio de aprovisionamiento, con el perfil y Engram seleccionados.
 6. **Sembrar preferencias.** Añade ajustes que faltan, los tres perfiles, routing
    inicial, concurrencia, política background, animaciones y reglas personales.
+   Configura RDD en `off` si no existe una decisión global previa, usando el CLI
+   oficial; conserva un `on` u `off` elegido previamente.
 7. **Verificar archivos.** Comprueba versiones, ejecutables, paquetes declarados
    e instalados y ausencia de declaraciones retiradas o duplicadas.
 8. **Publicar comandos.** Escribe `gsh`, `gsh-last` y su entorno común. Añade a
@@ -230,11 +243,11 @@ Comprueba:
 
 1. Proveedor `openai-codex`.
 2. Disponibilidad de `gpt-6-sol`, `gpt-6-luna` y `gpt-6-astra` para tu cuenta.
-3. Perfil `diario`, con orquestador Sol `high`.
+3. Perfil `daily`, con orquestador Sol `high`.
 4. Herramientas de memoria disponibles.
 5. Ningún fallo de carga de extensiones o herramientas duplicadas.
 
-Si Astra no está disponible para tu cuenta, `diario` utiliza exclusivamente Sol y
+Si Astra no está disponible para tu cuenta, `daily` utiliza exclusivamente Sol y
 Luna. No apliques los otros perfiles esperando una sustitución automática.
 
 Desde la terminal, una comprobación local posterior es:
@@ -272,7 +285,7 @@ TDD estricto. Indica el runner exacto y el modo cuando corresponda.
 /gentle:profiles
 ```
 
-Selecciona `diario`, `rendimiento` o `profundo` y pulsa Enter para aplicar.
+Selecciona `daily`, `performance` o `deep` y pulsa Enter para aplicar.
 La selección puede cambiar el modelo de la sesión actual si está autenticado y
 disponible. Para ajustar roles:
 
@@ -377,9 +390,14 @@ Consulta primero:
 /gentle:review-mode status
 ```
 
-En una instalación nueva, RDD es optativo. Este instalador no cambia el switch
-global de una instalación previa de Gentle AI: si aparece activo y quieres ODD
-sin RDD, utiliza explícitamente `disable`.
+La prueba real confirmó que **Gentle AI 3.7.0 usa RDD `on` por defecto**, aunque
+partes de la documentación de Gentle Shell lo describen como opt-in. Para aplicar
+la elección de este perfil, el instalador ejecuta el CLI oficial y guarda `off`
+cuando todavía no existe una decisión global. Es un estado compartido de Gentle AI
+en `~/.gentle-ai`, no una preferencia privada de la TUI.
+
+Una decisión global previa `on` u `off` se conserva. Si aparece activo y quieres
+ODD sin RDD, utiliza explícitamente `disable`.
 
 Para habilitar revisión nativa:
 
@@ -433,6 +451,12 @@ son **valores iniciales**: se conservan claves existentes, perfil seleccionado,
 perfiles editados y políticas elegidas en la interfaz. El bloque administrado de
 AGENTS y los lanzadores sí se actualizan desde este repositorio.
 
+Los nombres anteriores `diario`, `rendimiento` y `profundo` se migran a `daily`,
+`performance` y `deep`, conservando el perfil activo y sus asignaciones. Si hay
+dos perfiles distintos con el nombre antiguo y el nuevo, el instalador pide
+resolver el conflicto antes de desplegar. Los pins de otros repositorios se
+actualizan desde `/gentle:profiles`; no se recorren repositorios ajenos al instalar.
+
 Editar `templates/profiles.json` no reemplaza un perfil del mismo nombre ya
 personalizado en el equipo. Para cambiarlo, usa `/gentle:models` y `u`, o aplica
 deliberadamente los cambios al catálogo instalado después de respaldarlo.
@@ -466,6 +490,20 @@ haya terminado bien: consulta `/gentle:doctor` y, si hace falta, `gsh setup`.
 
 ### Actualizar versiones principales
 
+#### Aviso «Package Updates Available: pi-mcp-adapter»
+
+El setup de Gentle AI 3.7.0 declara `pi-mcp-adapter: ^2.6.0` en
+`~/.gentle-shell/agent/npm/package.json`. La instalación verificada usa **2.38.0**,
+mientras npm publica **3.1.0** como última versión. El aviso de Pi compara con la
+última publicación; no significa que un plugin haya fallado.
+
+La versión 3.x queda fuera del rango administrado por Gentle. `pi update
+--extensions` no es una garantía de resolver esa diferencia, y el setup puede
+volver a aplicar el rango 2.x. Mantén la versión comprobada hasta actualizar la
+integración de Gentle o decidir expresamente probar el cambio de versión mayor.
+
+#### Procedimiento
+
 1. Leer las notas de Pi, Gentle Shell y su pin de Gentle AI.
 2. Actualizar `versions.json`; Engram requiere cambiar también sus SHA-256.
 3. Revisar los esquemas y nombres de roles si upstream los ha cambiado.
@@ -490,6 +528,13 @@ revierte paquetes, migraciones de base ni otros efectos del setup de terceros.
 
 ## 13. Qué está verificado y qué falta al desplegar
 
+La [verificación real del 28 de septiembre](docs/verificacion.md) documenta la
+instalación en el equipo: 17 extensiones sin conflictos, Engram independiente,
+reanudación de una sesión sintética, prueba de TUI y OpenCode conservado. También
+se verificaron cero diagnósticos de colisión en skills, prompts y temas después
+del adaptador. Tras completar OAuth, una respuesta real de Sol `high` confirmó
+la conexión Codex y un arranque sin overrides confirmó ese modelo inicial.
+
 **Comprobaciones automatizadas locales:**
 
 - Esquemas utilizados y cobertura de roles de las tres plantillas.
@@ -513,6 +558,7 @@ la carga de recursos del proyecto; no es el sistema de permisos de OpenCode.
 | Archivo | Responsabilidad |
 | --- | --- |
 | `install.py` | Plan, requisitos, respaldo, runtimes, setup, configuración y comandos |
+| `pi_compat.py` | Elimina únicamente las rutas de recursos redundantes del paquete Gentle |
 | `check.py` | Comprobaciones de plantillas y archivos instalados |
 | `test_install.py` | Pruebas aisladas sin red ni llamadas a modelos |
 | `versions.json` | Versiones y hashes de Engram |
@@ -521,3 +567,4 @@ la carga de recursos del proyecto; no es el sistema de permisos de OpenCode.
 | `templates/AGENTS.md` | Reglas personales instaladas |
 | [docs/modelos.md](docs/modelos.md) | Asignaciones, esfuerzo y criterio de ajuste |
 | [docs/fuentes.md](docs/fuentes.md) | Documentación y versiones contrastadas |
+| [docs/verificacion.md](docs/verificacion.md) | Evidencia del despliegue real y pendientes |
