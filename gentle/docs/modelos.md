@@ -10,7 +10,9 @@
 - **`deep`**: Astra también implementa, coordina con `xhigh` y reserva `max`
   para especificación, diseño, verificación y revisión. Sol explora con `high`.
 
-Estos perfiles son decisiones iniciales, no benchmarks. Más razonamiento no
+Estos perfiles son decisiones iniciales. La
+[prueba real del 29 de septiembre](verificacion-perfiles.md) confirmó sus rutas y
+una tarea verificada por perfil; no es un benchmark general. Más razonamiento no
 garantiza mejores resultados para toda tarea y puede aumentar latencia y cuota.
 
 ## Matriz completa por grupo

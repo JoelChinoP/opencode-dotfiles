@@ -202,6 +202,11 @@ distintos que ya ocupen el nombre de destino.
 Quedan pendientes pruebas de delegación con modelos y los flujos SDD/RDD cuando
 se activen expresamente. No se hicieron llamadas a Luna o Astra para esta prueba.
 
+**Actualización del 29 de septiembre:** la
+[verificación de los tres perfiles](verificacion-perfiles.md) cubrió delegación,
+Luna, Astra, background y concurrencia. SDD/RDD siguen pendientes de activación
+expresa; los resultados anteriores describen el despliegue del día 28.
+
 ## Evidencias locales
 
 La primera fase utilizó este directorio temporal, ya no disponible al retomar:

@@ -535,6 +535,12 @@ se verificaron cero diagnósticos de colisión en skills, prompts y temas despu�
 del adaptador. Tras completar OAuth, una respuesta real de Sol `high` confirmó
 la conexión Codex y un arranque sin overrides confirmó ese modelo inicial.
 
+La [verificación de perfiles del 29 de septiembre](docs/verificacion-perfiles.md)
+añade llamadas reales a Sol, Luna y Astra: los tres perfiles completaron una
+corrección y sus cinco tests, con routing efectivo correcto en los nueve hijos.
+También se midieron arranque, consumo de la TUI y la cola de concurrencia 4.
+Es una muestra funcional acotada, no una garantía de rendimiento para toda tarea.
+
 **Comprobaciones automatizadas locales:**
 
 - Esquemas utilizados y cobertura de roles de las tres plantillas.
