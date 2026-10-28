@@ -11,6 +11,7 @@ case "${1:-}" in
 esac
 for script in "$root"/arch/*.sh; do bash -n "$script"; done
 for plugin in engram ponytail; do node --check "$config_dir/plugins/$plugin/index.js"; done
+node --check "$config_dir/plugins/ponytail/tui.js"
 python -I - "$config_dir" <<'PY'
 import hashlib, json, os, pathlib, shutil, subprocess, sys
 root = pathlib.Path(sys.argv[1])
@@ -43,7 +44,7 @@ assert ponytail["options"]["defaultMode"] == "lite"
 for name in ("engram", "ponytail"):
     plugin = root / "plugins" / name
     manifest = json.loads((plugin / "package.json").read_text())
-    assert (plugin / manifest["exports"]["."]).is_file(), name
+    assert (plugin / manifest.get("exports", {}).get(".", "./index.js")).is_file(), name
 cli = json.loads((root / "cli.json").read_text())
 assert cli["session"]["permissions"] == "prompt"
 turn_tokens = cli.get("debug", {}).get("turn_tokens", False)

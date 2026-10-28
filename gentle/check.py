@@ -26,11 +26,11 @@ def main():
     assert all("astra" not in entry["model"] for entry in profiles["profiles"]["daily"].values())
     assert profiles["profiles"]["daily"]["gentle-ai-explore"]["thinking"] == "medium"
     assert profiles["profiles"]["performance"]["gentle-ai-worker"] == {
-        "model": "openai-codex/gpt-6-sol", "thinking": "xhigh"
+        "model": "openai-codex/gpt-6.1-sol", "thinking": "xhigh"
     }
     for role in ("gentle-ai-explore", "sdd-explore", "sdd-onboard", "sdd-research"):
         assert profiles["profiles"]["deep"][role] == {
-            "model": "openai-codex/gpt-6-sol", "thinking": "high"
+            "model": "openai-codex/gpt-6.1-sol", "thinking": "high"
         }, role
     assert settings["compaction"]["reserveTokens"] > settings["compaction"]["keepRecentTokens"]
     print(f"OK: versiones, ajustes y {len(role_sets[0])} asignaciones por perfil")

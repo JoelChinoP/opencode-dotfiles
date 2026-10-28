@@ -3,8 +3,22 @@
 const policy = `Engram — memoria crítica, no registro de actividad.
 No busques al empezar cada tarea ni guardes al terminar cada respuesta.
 Lee solo si el usuario refiere historia ausente del contexto, falta una decisión
-previa o el resumen de compactación es insuficiente. Empieza con mem_search
-(limit <= 5); abre con mem_get_observation solo los IDs relevantes.
+previa o el resumen de compactación es insuficiente.
+Solo cuando haga falta memoria, reutiliza la identidad de proyecto ya verificada
+para el directorio de esta sesión. Si falta, llama una vez a mem_current_project
+y contrasta project_path/cwd con el repositorio actual; el cwd del MCP puede diferir.
+Con detección correcta del repositorio actual, omite project en las lecturas:
+un repositorio nuevo puede no existir aún en memoria y un filtro explícito fallaría.
+Para otro proyecto o una detección incorrecta, consulta mem_list_projects una vez
+y usa un nombre existente cuya relación con la tarea esté confirmada; no lo deduzcas
+del nombre de carpeta ni elijas otro por parecido. Reutiliza una lista ya disponible.
+Después usa mem_search (limit <= 5); abre con mem_get_observation solo IDs relevantes.
+Ante unknown_project o ambiguous_project, revisa error_code y available_projects;
+si falta una lista útil, usa mem_list_projects. No repitas la consulta con el mismo
+proyecto rechazado. Permite como máximo un reintento de lectura tras resolverlo;
+si sigue sin resolverse, continúa sin memoria. all_projects=true solo para una
+recuperación entre proyectos justificada por la tarea, no como fallback automático.
+No crees sesiones ni recuerdos para reparar una lectura fallida.
 mem_context: solo recuperación, compact=true y max_bytes<=8192; no inventes
 parámetros observations, prompts, sessions o pinned, que no existen en este MCP.
 Guarda solo conocimiento durable: +3 valor entre sesiones, +3 decisión/contrato,
@@ -58,7 +72,7 @@ export default {
     await ctx.session.hook("compaction", (event) => {
       event.system.push({
         type: "text",
-        text: "Conserva objetivo, decisiones, archivos activos, fallos pendientes, verificación e IDs de memoria útiles. Omite logs y búsquedas duplicadas. No ordenes llamadas automáticas a Engram al continuar.",
+        text: "Conserva objetivo, decisiones, archivos activos, fallos pendientes, verificación e IDs de memoria útiles. Conserva la identidad Engram verificada con su directorio y los proyectos rechazados para no repetir consultas fallidas. Omite logs y búsquedas duplicadas. No ordenes llamadas automáticas a Engram al continuar.",
       });
     });
   },

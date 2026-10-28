@@ -1,1 +1,1 @@
-{ "name": "ponytail-local-v2", "private": true, "type": "module", "exports": { ".": "./index.js" } }
+{ "name": "ponytail-local-v2", "private": true, "type": "module" }

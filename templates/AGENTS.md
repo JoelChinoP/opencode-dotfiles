@@ -14,6 +14,8 @@
   para evitar preguntas.
 - Limita salidas antes de traerlas al contexto; reutiliza resultados y no releas
   archivos sin cambios. Delega solo si el usuario lo pide o aporta una ventaja clara.
+- Ejecuta subagentes en primer plano (`background: false`) y espera sus resultados.
+  Usa segundo plano únicamente cuando el usuario lo solicite explícitamente.
 - Si necesitas buscar código en GitHub, usa gh si está disponible.
 - Context7: solo para documentación externa/versionada que falte en el contexto
   o una API incierta. Reutiliza el `libraryId`, consulta un tema concreto y no

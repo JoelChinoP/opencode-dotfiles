@@ -18,7 +18,11 @@ garantiza mejores resultados para toda tarea y puede aumentar latencia y cuota.
 ## Matriz completa por grupo
 
 Todos los modelos pertenecen a **`openai-codex`**. Sol, Luna y Astra corresponden
-a `gpt-6-sol`, `gpt-6-luna` y `gpt-6-astra`.
+a `gpt-6.1-sol`, `gpt-6-luna` y `gpt-6-astra`.
+
+Sol se actualizó a GPT-6.1 el 30 de septiembre de 2026, conservando roles y
+esfuerzos. Las pruebas reales del 28 y 29 de septiembre corresponden a la versión
+anterior; no demuestran la ejecución ni el rendimiento de GPT-6.1 Sol.
 
 | Roles | Daily | Performance | Deep |
 | --- | --- | --- | --- |

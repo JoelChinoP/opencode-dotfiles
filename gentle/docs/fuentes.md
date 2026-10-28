@@ -18,7 +18,7 @@ web pueden cambiar independientemente.
 - [Proveedor Codex](https://github.com/earendil-works/pi/blob/v0.87.1/packages/ai/src/providers/openai-codex.ts).
 - [Transporte Codex](https://github.com/earendil-works/pi/blob/v0.87.1/packages/ai/src/api/openai-codex-responses.ts).
 - [Generador de catálogo: límites, niveles y caché](https://github.com/earendil-works/pi/blob/v0.87.1/packages/ai/scripts/generate-models.ts).
-- Catálogo público: [Sol](https://pi.dev/models/openai-codex/gpt-6-sol),
+- Catálogo público actual: [Sol](https://pi.dev/models/openai-codex/gpt-6.1-sol),
   [Luna](https://pi.dev/models/openai-codex/gpt-6-luna),
   [Astra](https://pi.dev/models/openai-codex/gpt-6-astra).
 

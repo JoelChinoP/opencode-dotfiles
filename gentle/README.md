@@ -242,7 +242,7 @@ Después:
 Comprueba:
 
 1. Proveedor `openai-codex`.
-2. Disponibilidad de `gpt-6-sol`, `gpt-6-luna` y `gpt-6-astra` para tu cuenta.
+2. Disponibilidad de `gpt-6.1-sol`, `gpt-6-luna` y `gpt-6-astra` para tu cuenta.
 3. Perfil `daily`, con orquestador Sol `high`.
 4. Herramientas de memoria disponibles.
 5. Ningún fallo de carga de extensiones o herramientas duplicadas.

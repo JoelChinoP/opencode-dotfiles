@@ -10,8 +10,8 @@ Engram 2.0.0.
 | Engram MCP local | Activado; memoria crítica y contexto limitado |
 | CodeGraph MCP local | `codegraph serve --mcp`, desactivado por defecto |
 | Engram local V2 | Política crítica y guía de compactación |
-| Ponytail local V2 | Reglas por turno en `lite`; `/ponytail` cambia el modo |
-| subagent-statusline.v2 local | Pie y barra lateral de la TUI |
+| Ponytail local V2 | Reglas por turno en `lite`; `/ponytail full` cambia el modo y lo confirma con un aviso en la TUI de la sesión |
+| subagent-statusline.v2 local | Estado y navegación de subagentes en la TUI |
 | Herdr | Integración oficial automática si ya está instalado, estable >= 0.9.1 |
 | Skills documentales y diseño | `document-files` local y `frontend-design` fijada |
 | Navegador | Skill y `@playwright/cli@0.1.21` fijados; Chromium del sistema |
@@ -57,10 +57,32 @@ directorio del proyecto. V2 ya descubre/inicia un servicio separado de la termin
 - Títulos: `agents.title.model` usa `opencode/big-pickle`, gratuito y disponible
   desde octubre de 2025. El catálogo lo admite, pero la prueba real con V2.0.8
   recibe HTTP 403 de Zen; véase [verificación](docs/verificacion.md).
-- Astra, Sol y Luna de GPT-6, incluidas sus variantes Fast, y Terra/Luna de GPT-5.6
+- Sol de GPT-6.1, Astra/Luna de GPT-6, incluidas sus variantes Fast, y Terra/Luna de GPT-5.6
   compactan aproximadamente a 350k (`input: 370000`, buffer de 20k).
   Se conservan 30k recientes. Detalles y fuentes en el
   [análisis de contexto y consumo](docs/contraste-dotfiles.md#3-modelos-y-compactación).
+
+## Subagentes
+
+Las reglas globales indican primer plano (`background: false`) y esperar el
+resultado; segundo plano solo por solicitud explícita del usuario.
+
+El panel usa etiquetas en inglés y muestra tarea, agente/modelo, estado y tiempo
+de sesión. Prioriza los subagentes que esperan permiso/respuesta y los que siguen
+trabajando; distingue terminados, interrumpidos y errores. Muestra hasta cinco
+filas y se oculta cuando la sesión no tiene subagentes. El tiempo va desde la
+creación hasta el último reposo, o hasta ahora si sigue activo; no es tiempo
+facturado del modelo.
+
+- `[Open]` o clic en el título: entra en la sesión hija.
+- `/subagents` o `↓` desde el prompt vacío: abre el selector nativo.
+- Dentro del selector: `Ctrl+A` alterna activos/inactivos, `Enter` abre el
+  seleccionado y `Ctrl+D` lo interrumpe. `Ctrl+D` fuera del selector tiene otra
+  función. En la navegación de la sesión hija, `↑` vuelve al padre.
+
+Panel y controles nativos comprobados en OpenCode **2.0.32**, incluida una
+interrupción real de un subagente de prueba. `node arch/check.mjs` cubre estados,
+prioridad y duración.
 
 ## Archivos
 

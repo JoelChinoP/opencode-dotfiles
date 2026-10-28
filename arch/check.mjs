@@ -6,6 +6,36 @@ import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
 import engram from "../templates/plugins/engram/index.js";
 import ponytail from "../templates/plugins/ponytail/index.js";
+import ponytailTui from "../templates/plugins/ponytail/tui.js";
+import { children, elapsed, state } from "../templates/plugins/subagent-statusline.v2/state.js";
+
+// --- Subagentes: estados reales V2, prioridad y duración ---
+const child = (id, outcome, updated = 1000) => ({
+  id, parentID: "root", outcome, time: { created: 0, updated, idle: 65000 },
+});
+const childSessions = [
+  child("done", "succeeded", 9000), child("stopped", "interrupted"),
+  child("error", "failed"), child("busy", "succeeded"), child("waiting"),
+  child("question"), child("unknown"),
+];
+const running = new Set(["busy", "waiting", "question"]);
+const childContext = {
+  data: { session: {
+    root: () => "root",
+    family: () => ["root", ...childSessions.map((session) => session.id), "missing"],
+    get: (id) => id === "root" ? { id } : childSessions.find((session) => session.id === id),
+    status: (id) => running.has(id) ? "running" : "idle",
+    permission: { list: (id) => id === "waiting" ? [{}] : [] },
+    form: { list: (id) => id === "question" ? [{}] : [] },
+  } },
+};
+assert.deepEqual(childSessions.map((session) => state(childContext, session)),
+  ["done", "interrupted", "failed", "running", "permission", "question", "idle"]);
+assert.deepEqual(children(childContext).map((session) => session.id), []);
+assert.deepEqual(children(childContext, "root").map((session) => session.id),
+  ["waiting", "question", "busy", "error", "stopped", "unknown", "done"]);
+assert.equal(elapsed(childSessions[0], false, 999000), "1m 5s");
+assert.equal(elapsed(childSessions[3], true, 125000), "2m 5s");
 
 // --- Ponytail: nivel inicial, comandos y aislamiento por sesión ---
 async function ponytailHarness(options) {
@@ -47,6 +77,44 @@ assert.match(await (await ponytailHarness({ defaultMode: "lite" })).context("ses
 process.env.PONYTAIL_DEFAULT_MODE = "invalido";
 assert.match(await (await ponytailHarness({ defaultMode: "full" })).context("ses_d"), /Level: full/);
 delete process.env.PONYTAIL_DEFAULT_MODE;
+
+// La TUI confirma solo después de persistir el modo mediante el comando servidor.
+let ponytailUiCommand;
+let ponytailRoute = { type: "session", sessionID: "ses_ui" };
+const toasts = [];
+let allowCommand;
+const commandReady = new Promise((resolve) => { allowCommand = resolve; });
+ponytailTui.setup({
+  keymap: { layer: (factory) => { [ponytailUiCommand] = factory().commands; } },
+  ui: {
+    router: { current: () => ponytailRoute },
+    toast: { show: (toast) => toasts.push(toast) },
+  },
+  client: { session: { command: async ({ sessionID, name, text }) => {
+    assert.equal(name, "ponytail");
+    await commandReady;
+    await harness.command.execute({ sessionID, prompt: { text } });
+  } } },
+});
+assert.deepEqual(ponytailUiCommand.slash, { name: "ponytail", arguments: true });
+assert.equal(ponytailUiCommand.enabled(), true);
+const changingMode = ponytailUiCommand.run(" FULL ");
+assert.equal(toasts.length, 0);
+allowCommand();
+await changingMode;
+assert.match(await harness.context("ses_ui"), /Level: full/);
+assert.equal(toasts.at(-1).variant, "success");
+assert.match(toasts.at(-1).message, /full/);
+await ponytailUiCommand.run("off");
+assert.equal(await harness.context("ses_ui"), "");
+assert.match(toasts.at(-1).message, /Desactivado/);
+await ponytailUiCommand.run();
+assert.match(await harness.context("ses_ui"), /Level: full/);
+await ponytailUiCommand.run("typo");
+assert.equal(toasts.at(-1).variant, "error");
+assert.match(await harness.context("ses_ui"), /Level: full/);
+ponytailRoute = { type: "home" };
+assert.equal(ponytailUiCommand.enabled(), false);
 
 // --- Engram: política crítica, límite de contexto y sustitución del protocolo ---
 const hooks = new Map();
@@ -169,7 +237,7 @@ const models = config.providers.openai.models;
 assert.equal(config.agents.title.model, "opencode/big-pickle");
 assert.deepEqual(config.compaction, { auto: true, keep: { tokens: 30000 }, buffer: 20000 });
 for (const [id, options] of Object.entries(models)) {
-  assert.match(id, /^(gpt-6-(astra|sol|luna)|gpt-5\.6-(luna|terra))(-fast)?$/);
+  assert.match(id, /^(gpt-6-(astra|luna)|gpt-6\.1-sol|gpt-5\.6-(luna|terra))(-fast)?$/);
   for (const [name, value] of Object.entries(options.limit)) {
     assert.ok(["context", "input", "output"].includes(name));
     assert.ok(Number.isInteger(value) && value > 0, `${id}: limit.${name}`);
@@ -180,4 +248,4 @@ for (const [id, options] of Object.entries(models)) {
   assert.equal(threshold, 350000, `${id}: umbral de compactación`);
 }
 
-console.log("OK: Ponytail; Engram; skills y runtime fijados; permisos, modelos y títulos.");
+console.log("OK: subagentes (estados, orden y duración); Ponytail; Engram; skills y runtime fijados; permisos, modelos y títulos.");
