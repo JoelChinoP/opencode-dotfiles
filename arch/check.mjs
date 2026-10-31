@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
 import engram from "../templates/plugins/engram/index.js";
 import ponytail from "../templates/plugins/ponytail/index.js";
-import ponytailTui from "../templates/plugins/ponytail/tui.js";
+import ponytailTui, { watchMode } from "../templates/plugins/ponytail/ui.js";
 import { children, elapsed, state } from "../templates/plugins/subagent-statusline.v2/state.js";
 
 // --- Subagentes: estados reales V2, prioridad y duración ---
@@ -38,21 +38,42 @@ assert.equal(elapsed(childSessions[0], false, 999000), "1m 5s");
 assert.equal(elapsed(childSessions[3], true, 125000), "2m 5s");
 
 // --- Ponytail: nivel inicial, comandos y aislamiento por sesión ---
-async function ponytailHarness(options) {
+async function ponytailHarness(options, storage = new Map()) {
   const hooks = new Map();
-  const storage = new Map();
-  let command;
+  const listeners = new Set();
+  const events = [];
+  let rpc;
+  const location = { directory: "/ponytail-test" };
   await ponytail.setup({
     options,
     storage: {
       get: async (key) => storage.get(key),
       set: async (key, value) => storage.set(key, value),
     },
-    session: { hook: async (name, callback) => hooks.set(name, callback) },
-    command: { transform: async (callback) => callback({ add: (definition) => { command = definition; } }) },
+    session: {
+      hook: async (name, callback) => hooks.set(name, callback),
+      get: async ({ sessionID }) => {
+        if (sessionID === "missing") throw new Error("Session not found");
+        return { id: sessionID, location };
+      },
+    },
+    rpc: { register: async (definition, handlers) => {
+      assert.equal(definition.id, "ponytail");
+      rpc = { ...handlers, events: { on: (name, callback) => {
+        assert.equal(name, "updated");
+        listeners.add(callback);
+        return () => listeners.delete(callback);
+      } } };
+      return { events: { emit: async (name, data) => {
+        assert.equal(name, "updated");
+        events.push(data);
+        for (const callback of listeners) callback({ data, location });
+      } } };
+    } },
+    command: { transform: () => assert.fail("/ponytail solo se registra en la TUI") },
   });
   return {
-    command,
+    rpc, storage, events, listeners, location,
     context: async (sessionID) => {
       const event = { sessionID, system: [] };
       await hooks.get("context")(event);
@@ -65,12 +86,19 @@ async function ponytailHarness(options) {
 delete process.env.PONYTAIL_DEFAULT_MODE;
 const harness = await ponytailHarness({ defaultMode: "lite" });
 assert.match(await harness.context("ses_a"), /Level: lite/);
-await harness.command.execute({ sessionID: "ses_a", prompt: { text: "" } });
+await harness.rpc.set({ sessionID: "ses_a", mode: "" });
 assert.match(await harness.context("ses_a"), /Level: full/);
 assert.match(await harness.context("ses_b"), /Level: lite/);
-await assert.rejects(harness.command.execute({ sessionID: "ses_a", prompt: { text: "typo" } }));
+await assert.rejects(harness.rpc.set({ sessionID: "ses_a", mode: "typo" }));
+await assert.rejects(harness.rpc.set({ sessionID: "missing", mode: "full" }));
+assert.equal(harness.storage.has("mode/missing"), false);
+assert.equal(harness.events.length, 1);
 await harness.prompt("ses_a", "stop ponytail");
 assert.equal(await harness.context("ses_a"), "");
+assert.deepEqual(harness.events.at(-1), { sessionID: "ses_a", mode: "off" });
+assert.equal((await harness.rpc.get({ sessionID: "ses_b" })).mode, "lite");
+const restored = await ponytailHarness({ defaultMode: "lite" }, harness.storage);
+assert.equal((await restored.rpc.get({ sessionID: "ses_a" })).mode, "off");
 
 process.env.PONYTAIL_DEFAULT_MODE = "ultra";
 assert.match(await (await ponytailHarness({ defaultMode: "lite" })).context("ses_c"), /Level: ultra/);
@@ -78,24 +106,45 @@ process.env.PONYTAIL_DEFAULT_MODE = "invalido";
 assert.match(await (await ponytailHarness({ defaultMode: "full" })).context("ses_d"), /Level: full/);
 delete process.env.PONYTAIL_DEFAULT_MODE;
 
-// La TUI confirma solo después de persistir el modo mediante el comando servidor.
+// La TUI confirma solo después de persistir el modo mediante el RPC servidor.
 let ponytailUiCommand;
 let ponytailRoute = { type: "session", sessionID: "ses_ui" };
 const toasts = [];
+let ponytailCommandCalls = 0;
 let allowCommand;
 const commandReady = new Promise((resolve) => { allowCommand = resolve; });
-ponytailTui.setup({
+let reconnect;
+let getMode = harness.rpc.get;
+const uiContext = {
   keymap: { layer: (factory) => { [ponytailUiCommand] = factory().commands; } },
+  location: harness.location,
+  data: {
+    session: { get: () => ({ location: harness.location }) },
+    on: (name, callback) => {
+      assert.equal(name, "server.connected");
+      reconnect = callback;
+      return () => { reconnect = undefined; };
+    },
+  },
   ui: {
     router: { current: () => ponytailRoute },
     toast: { show: (toast) => toasts.push(toast) },
   },
-  client: { session: { command: async ({ sessionID, name, text }) => {
-    assert.equal(name, "ponytail");
-    await commandReady;
-    await harness.command.execute({ sessionID, prompt: { text } });
-  } } },
-});
+  client: { rpc: () => ({
+    ...harness.rpc,
+    get: (input, options) => {
+      assert.deepEqual(options.location, harness.location);
+      return getMode(input);
+    },
+    set: async (input, options) => {
+      ponytailCommandCalls += 1;
+      assert.deepEqual(options.location, harness.location);
+      await commandReady;
+      return harness.rpc.set(input);
+    },
+  }) },
+};
+ponytailTui.setup(uiContext);
 assert.deepEqual(ponytailUiCommand.slash, { name: "ponytail", arguments: true });
 assert.equal(ponytailUiCommand.enabled(), true);
 const changingMode = ponytailUiCommand.run(" FULL ");
@@ -114,7 +163,49 @@ await ponytailUiCommand.run("typo");
 assert.equal(toasts.at(-1).variant, "error");
 assert.match(await harness.context("ses_ui"), /Level: full/);
 ponytailRoute = { type: "home" };
+assert.equal(ponytailUiCommand.enabled(), true);
+const callsBeforeHome = ponytailCommandCalls;
+for (const input of [undefined, "full", "off"]) {
+  await ponytailUiCommand.run(input);
+  assert.equal(toasts.at(-1).variant, "info");
+  assert.match(toasts.at(-1).message, /Inicia un chat/);
+}
+assert.equal(ponytailCommandCalls, callsBeforeHome);
+assert.deepEqual(ponytailRoute, { type: "home" });
+ponytailRoute = { type: "plugin" };
 assert.equal(ponytailUiCommand.enabled(), false);
+
+// Panel: modo real al abrir, cambios externos, respuestas tardías y reconexión.
+const displayedModes = [];
+const stopWatching = watchMode(uiContext, "ses_ui", (mode) => displayedModes.push(mode));
+await new Promise(setImmediate);
+assert.equal(displayedModes.at(-1), "full");
+await harness.prompt("ses_ui", "normal mode");
+assert.equal(displayedModes.at(-1), "off");
+await harness.rpc.set({ sessionID: "ses_other", mode: "ultra" });
+assert.equal(displayedModes.at(-1), "off");
+for (const callback of harness.listeners) {
+  callback({ data: { sessionID: "ses_ui", mode: "ultra" }, location: { directory: "/other" } });
+}
+assert.equal(displayedModes.at(-1), "off");
+let staleReply;
+getMode = () => new Promise((resolve) => { staleReply = resolve; });
+reconnect();
+await harness.rpc.set({ sessionID: "ses_ui", mode: "lite" });
+staleReply({ mode: "off" });
+await new Promise(setImmediate);
+assert.equal(displayedModes.at(-1), "lite");
+getMode = async () => { throw new Error("disconnected"); };
+reconnect();
+await new Promise(setImmediate);
+assert.equal(displayedModes.at(-1), null);
+getMode = harness.rpc.get;
+reconnect();
+await new Promise(setImmediate);
+assert.equal(displayedModes.at(-1), "lite");
+stopWatching();
+assert.equal(harness.listeners.size, 0);
+assert.equal(reconnect, undefined);
 
 // --- Engram: política crítica, límite de contexto y sustitución del protocolo ---
 const hooks = new Map();

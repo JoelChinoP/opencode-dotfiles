@@ -11,7 +11,8 @@ case "${1:-}" in
 esac
 for script in "$root"/arch/*.sh; do bash -n "$script"; done
 for plugin in engram ponytail; do node --check "$config_dir/plugins/$plugin/index.js"; done
-node --check "$config_dir/plugins/ponytail/tui.js"
+for file in rpc.js ui.js; do node --check "$config_dir/plugins/ponytail/$file"; done
+test -f "$config_dir/plugins/ponytail/tui.tsx"
 python -I - "$config_dir" <<'PY'
 import hashlib, json, os, pathlib, shutil, subprocess, sys
 root = pathlib.Path(sys.argv[1])

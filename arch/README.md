@@ -278,6 +278,30 @@ La versión local anterior, Herdr **0.8.2**, instalaba la integración V1
 carga correctamente. Esa versión antigua además ignoraba `XDG_CONFIG_HOME` y escribía
 en `~/.config/opencode`; la actual respeta las rutas configuradas.
 
+#### Enlaces a archivos locales
+
+Con Herdr >= 0.9.5, registra una vez el manejador opcional desde este checkout:
+
+```sh
+herdr plugin link "$PWD/arch/herdr-file-links"
+```
+
+La regla global entrega archivos como `[ruta absoluta](file:///ruta/archivo)`.
+**Ctrl+clic** muestra el archivo seleccionado en el explorador mediante
+`org.freedesktop.FileManager1.ShowItems` (por ejemplo, Nautilus). Requiere
+`busctl` de systemd y una sesión gráfica local con ese servicio D-Bus.
+Solo acepta enlaces `file:///...` o `file://localhost/...`; no abre documentos
+en su aplicación ni resuelve rutas de otra máquina por SSH.
+
+El manejador se ejecuta únicamente al pulsar el enlace, sin procesos residentes
+ni llamadas al modelo. Conserva los controles del ratón de Herdr. El registro
+es global e independiente del perfil de OpenCode; mantiene un enlace a este
+checkout, que debe permanecer en su ubicación. Para retirarlo:
+
+```sh
+herdr plugin unlink opencode-dotfiles.file-links
+```
+
 Las skills integradas `opencode` y `report` continúan permitidas. Las copias que
 existan en `~/.claude/skills` o `~/.agents/skills` siguen en disco, pero no se
 anuncian mientras su ID no tenga una regla de permiso explícita.

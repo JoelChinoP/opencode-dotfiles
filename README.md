@@ -17,6 +17,27 @@ Engram 2.0.0.
 | Navegador | Skill y `@playwright/cli@0.1.21` fijados; Chromium del sistema |
 | Gobernanza de skills | Catálogo permitido y mantenimiento manual no autoinvocable |
 
+Desde la pantalla inicial, `/ponytail` muestra un aviso para iniciar un chat y
+permanece en el inicio. Dentro de una sesión, cambia el modo y confirma el resultado.
+El panel derecho muestra el modo efectivo (`lite`, `full`, `ultra` u `off`),
+incluidas las sesiones retomadas. El comando se registra una sola vez en la TUI;
+los cambios y la consulta del estado usan el RPC del plugin servidor.
+
+Uso recomendado: `lite` como base diaria, incluidas revisiones normales;
+`/ponytail full` para implementación o refactorización con énfasis en soluciones
+mínimas, y `/ponytail lite` para volver. No hay cambios automáticos de nivel.
+Las sesiones nuevas empiezan en `lite`; las retomadas conservan su selección.
+La TUI muestra una sola línea: `Ponytail · lite/full/ultra/off`.
+
+- `/ponytail-review [commit, rama o archivos]`: revisión puntual de cambios;
+  sin argumentos revisa los cambios sin confirmar.
+- `/ponytail-audit [directorio o módulo]`: auditoría del alcance indicado;
+  sin argumentos analiza el repositorio actual.
+
+Son procedimientos locales bajo demanda, de solo lectura y sin cambiar el modo.
+Sus instrucciones se envían únicamente al invocarlos. `/review` nativo sigue
+disponible. Las plantillas viven en `templates/commands/`.
+
 ## Instalar
 
 Lee [arch/README.md](arch/README.md) antes de ejecutar:

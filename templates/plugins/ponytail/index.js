@@ -1,4 +1,5 @@
 // Adaptación local V2 de Ponytail 4.10.0; procedencia y licencia en docs/fuentes.md.
+import { Ponytail } from "./rpc.js";
 const modes = new Set(["lite", "full", "ultra", "off"]);
 const rules = `Ponytail: lazy means efficient, not careless.
 Understand the task, trace the real flow and inspect callers before changing code.
@@ -30,24 +31,35 @@ export default {
   async setup(ctx) {
     const defaultMode = resolveDefault(ctx.options);
 
-    await ctx.command.transform((editor) => {
-      editor.add({
-        name: "ponytail",
-        description: "Ponytail lite|full|ultra|off (sin argumento: full)",
-        async execute({ sessionID, prompt }) {
-          const mode = prompt.text.trim().toLowerCase() || "full";
-          if (!modes.has(mode)) throw new Error("Use /ponytail lite|full|ultra|off");
-          await ctx.storage.set(`mode/${sessionID}`, mode);
-        },
-      });
+    const get = async (sessionID) => ({
+      sessionID,
+      mode: (await ctx.storage.get(`mode/${sessionID}`)) ?? defaultMode,
+    });
+    const set = async (sessionID, mode) => {
+      await ctx.storage.set(`mode/${sessionID}`, mode);
+      const state = { sessionID, mode };
+      await registration.events.emit("updated", state);
+      return state;
+    };
+    const registration = await ctx.rpc.register(Ponytail, {
+      get: async ({ sessionID }) => {
+        await ctx.session.get({ sessionID });
+        return get(sessionID);
+      },
+      set: async ({ sessionID, mode: input }) => {
+        const mode = input.trim().toLowerCase() || "full";
+        if (!modes.has(mode)) throw new Error("Use /ponytail lite|full|ultra|off");
+        await ctx.session.get({ sessionID });
+        return set(sessionID, mode);
+      },
     });
     await ctx.session.hook("prompt", async ({ sessionID, prompt }) => {
       if (/^(stop ponytail|normal mode)\s*[.!]?$/i.test(prompt.text.trim())) {
-        await ctx.storage.set(`mode/${sessionID}`, "off");
+        await set(sessionID, "off");
       }
     });
     await ctx.session.hook("context", async (event) => {
-      const mode = (await ctx.storage.get(`mode/${event.sessionID}`)) ?? defaultMode;
+      const { mode } = await get(event.sessionID);
       if (mode === "off") return;
       event.system.push({ type: "text", text: `${rules}\nLevel: ${mode}. ${intensity[mode]}` });
     });

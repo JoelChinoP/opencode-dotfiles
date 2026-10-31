@@ -1,6 +1,8 @@
 # Reglas globales
 
 - Responde en español. Respeta las convenciones del proyecto.
+- Al entregar archivos, usa `[ruta absoluta del archivo](file:///ruta/archivo)`;
+  codifica los caracteres especiales de la URI y no repitas la ruta ni la carpeta.
 - Antes de editar, entiende el flujo real y sus llamadores; reutiliza lo existente.
 - Busca primero en código fuente, tests y manifiestos; acota `grep`/`glob` por
   ruta y tipo de archivo. Respeta `.gitignore`; evita búsquedas sin exclusiones.
