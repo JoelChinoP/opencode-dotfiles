@@ -1,5 +1,50 @@
 # Verificación del perfil Arch
 
+## Engram y Ponytail — 03-11-2026
+
+OpenCode CLI/servicio **2.2.0**, Engram **3.6.1** y Ponytail oficial **5.3.3**.
+Actualización puntual del perfil instalado; se preservan modelos, comandos
+locales, permisos existentes, Herdr y preferencias TUI.
+
+- Archivo Engram amd64 validado con el SHA-256 de la release oficial. El binario
+  2.0.0 y un respaldo SQLite coherente del estado anterior se conservan bajo el
+  directorio administrado de binarios/respaldos.
+- Migración probada primero en copia y después verificada en la base real:
+  `integrity_check=ok`, 720 observaciones, 400 sesiones y 460 prompts históricos.
+  Se compararon IDs, títulos, contenidos y propietarios; no cambiaron.
+- MCP 3.6.1 probado en una base aislada: handshake, 23 herramientas, registro de
+  sesión con directorio, save, search, contexto, update con `expected_project` y
+  cierre. Propietario incorrecto rechazado y cero prompts nuevos con
+  `capture_prompt=false`.
+- Se mantiene el pequeño plugin local de política Engram. No se instala el
+  adaptador oficial con captura automática. Los cuatro MCP del servicio usan ya
+  el ejecutable 3.6.1 y aparecen conectados; no quedan procesos 2.0.0.
+- Ponytail aparece `active` con origen npm y versión 5.3.3. Se retira del perfil
+  el adaptador local 4.10.0 para evitar duplicados. Sus seis comandos y skills
+  están registrados. La configuración global anterior `defaultMode: off` pasa
+  a `lite`, y `.ponytail-active` contiene `lite`.
+- `node arch/check-ponytail.mjs /ruta/paquete`: correcto tanto contra el tarball
+  oficial como contra el paquete de la caché realmente cargado por OpenCode.
+  Prueba `lite` desde la primera petición sin enviar prompts, persistencia entre
+  sesiones, modificación por archivo sin chat y reglas durante compactación.
+- `node arch/check.mjs`: correcto. Se corrigió una expectativa de modelos
+  previamente desalineada con los cinco IDs de la plantilla; no se cambió la
+  selección de modelos.
+- `TMPDIR=/tmp/opencode python -I arch/check-install.py`: instalación y
+  reinstalación Bash/Zsh, respaldos, conservación de otras opciones Ponytail,
+  `lite` persistente y rechazo de configuración inválida antes del despliegue.
+- La comprobación específica del perfil real confirmó versiones, plugins, MCP,
+  comandos/skills, default y conservación semántica del resto de la configuración.
+  `arch/verify.sh --live` se detiene en una diferencia **preexistente**:
+  `cli.json` tiene `session.permissions: autoaccept`, mientras el perfil base
+  exige `prompt`. Se conserva la preferencia del usuario; no es un fallo de las
+  integraciones actualizadas.
+
+Límites: sin medición de ahorro de tokens ni prueba visual de la TUI. El plugin
+oficial Ponytail comparte nivel entre sesiones y no incluye el indicador lateral
+del adaptador anterior. Los benchmarks upstream no demuestran ahorros frente al
+perfil local en OpenCode. Las verificaciones anteriores se conservan como historia.
+
 ## Sincronización con el equipo — 27-09-2026
 
 OpenCode instalado y servicio **2.0.15**, Engram **2.0.0** y Herdr **0.9.1** con

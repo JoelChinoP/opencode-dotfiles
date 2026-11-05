@@ -59,6 +59,15 @@ Se conserva `$schema` por integración del editor.
 - Playwright usa CLI fijada y Chromium del sistema, no browser MCP. Se mantienen
   fuera GitHub MCP, cachés personalizadas, embeddings, router y gestor de presupuestos.
 
+## Actualización — 03-11-2026
+
+Engram pasa a 3.6.1 manteniendo el gate crítico local. El adaptador oficial ya
+soporta V2 desde 3.0.0; se conserva el local por su política de memoria, no por
+incompatibilidad. `mem_update` requiere `expected_project` y el registro de sesión
+recibe su directorio absoluto. Ponytail pasa al paquete oficial 5.3.3 con `lite`
+persistente global y seis comandos/skills; sustituye el adaptador local y su TUI.
+Las referencias siguientes a 2.0.0/4.10.0 describen la implementación anterior.
+
 ## Engram: gate crítico
 
 El plugin previo no solo inyectaba instrucciones: guardaba prompts, capturaba

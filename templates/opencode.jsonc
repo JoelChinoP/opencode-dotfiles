@@ -17,16 +17,11 @@
   "providers": {
     "openai": {
       "models": {
-        "gpt-6-astra": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-6-astra-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-6.1-sol": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-6.1-sol-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-5.6-terra": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-5.6-terra-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
+        "gpt-6-astra": { "limit": { "context": 550000, "input": 420000, "output": 128000 } },
+        "gpt-6.1-sol": { "limit": { "context": 700000, "input": 570000, "output": 128000 } },
+        "gpt-6.1-terra": { "limit": { "context": 600000, "input": 470000, "output": 128000 } },
         "gpt-6-luna": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-6-luna-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-5.6-luna": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-5.6-luna-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } }
+        "gpt-6-luna-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } }
       }
     }
   },
@@ -38,12 +33,7 @@
     "~/.config/opencode/skills"
   ],
   "plugins": [
-    {
-      "package": "./plugins/ponytail",
-      "options": {
-        "defaultMode": "lite"
-      }
-    },
+    "@dietrichgebert/ponytail@5.3.3",
     "./plugins/engram"
   ],
   "mcp": {
@@ -86,6 +76,12 @@
     { "action": "skill", "resource": "frontend-design", "effect": "allow" },
     { "action": "skill", "resource": "playwright-cli", "effect": "allow" },
     { "action": "skill", "resource": "skill-governance", "effect": "allow" },
+    { "action": "skill", "resource": "ponytail", "effect": "allow" },
+    { "action": "skill", "resource": "ponytail-review", "effect": "allow" },
+    { "action": "skill", "resource": "ponytail-audit", "effect": "allow" },
+    { "action": "skill", "resource": "ponytail-debt", "effect": "allow" },
+    { "action": "skill", "resource": "ponytail-gain", "effect": "allow" },
+    { "action": "skill", "resource": "ponytail-help", "effect": "allow" },
     { "action": "read", "resource": "~/.ssh/*", "effect": "deny" },
     { "action": "edit", "resource": "~/.ssh/*", "effect": "deny" },
     { "action": "read", "resource": "*.pem", "effect": "ask" },

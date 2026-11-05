@@ -10,7 +10,7 @@ sudo pacman -Syu --needed opencode python nodejs npm curl tar coreutils git ripg
 opencode --version
 ```
 
-Debe ser OpenCode **V2**; la instalación actual está verificada con `2.0.15`
+Debe ser OpenCode **V2**; la instalación actual está verificada con `2.2.0`
 (las pruebas iniciales se hicieron con `2.0.8`). `pacman -Si opencode`
 permite comprobar la versión ofrecida por tu mirror. No se usa AUR ni paru.
 Python se usa con su biblioteca estándar y `-I`; no se activa ningún venv ni se
@@ -29,11 +29,11 @@ no se exportará `VIRTUAL_ENV` ni se añadirá un venv al `PATH`. `uv` no se ins
 por anticipado.
 
 Engram no está en los repositorios oficiales consultados. El instalador sigue el
-método oficial de archivo binario: **2.0.0 estable**, Linux amd64/arm64 y SHA-256
+método oficial de archivo binario: **3.6.1 estable**, Linux amd64/arm64 y SHA-256
 fijado. Lo guarda en:
 
 ```text
-${XDG_DATA_HOME:-$HOME/.local/share}/opencode-dotfiles-v2/bin/engram-2.0.0
+${XDG_DATA_HOME:-$HOME/.local/share}/opencode-dotfiles-v2/bin/engram-3.6.1
 ```
 
 El MCP usa esa ruta absoluta generada. No depende del `engram` antiguo de tu PATH
@@ -76,8 +76,9 @@ El script realiza, en orden:
    contenido del perfil anterior al respaldo, incluso si la carpeta es un symlink.
    Intercambia los perfiles con renames en el mismo
    filesystem y restaura el anterior si falla el segundo movimiento.
-7. Instala `PONYTAIL_DEFAULT_MODE=lite` y el directorio de herramientas
-   administradas, respaldando y normalizando el entorno anterior.
+7. Fija `lite` en `opencode/.ponytail-active`, `ponytail/config.json` y
+   `PONYTAIL_DEFAULT_MODE`; respalda la configuración y el entorno anteriores.
+   OpenCode resuelve el paquete oficial `@dietrichgebert/ponytail@5.3.3` al cargar.
 8. Añade `oc` y `oc-last` en Bash/Zsh sin duplicarlos al reinstalar; retira los
    aliases simples y el monitor instalados por la versión anterior.
 9. Si Herdr estable >= 0.9.1 está en el PATH, ejecuta su integración oficial para
@@ -99,7 +100,7 @@ Cada ejecución imprime el respaldo único bajo
 `${XDG_DATA_HOME:-$HOME/.local/share}/opencode-dotfiles-v2/backups/`.
 Reinstalar vuelve a aplicar las plantillas y crea otro respaldo; incorpora cambios
 permanentes a las plantillas o recupéralos después. No hay actualizaciones móviles:
-Engram, las skills y Playwright se cambian explícitamente con versión/commit y locks.
+Engram, Ponytail, las skills y Playwright se cambian explícitamente con versión/commit y locks.
 
 Para separar despliegue y activación:
 
@@ -190,15 +191,15 @@ el uso normal de la TUI por SSH.
 - Context7 funciona sin clave en la prueba realizada. Si solicita autenticación,
   usa `/mcps`, selecciona Context7 e inicia sesión. No se guarda ninguna clave
   en el repositorio; la autenticación depende del servidor y sus límites.
-- Engram debe aparecer `connected`; usa `--tools=agent` (19 herramientas en 2.0.0).
+- Engram debe aparecer `connected`; usa `--tools=agent` (23 herramientas en 3.6.1).
 - CodeGraph debe aparecer `disabled`. La entrada es local:
   `codegraph serve --mcp`. El perfil no instala el binario ni genera índices.
   Actívalo solo en el proyecto que lo necesite, con el ejecutable disponible y su
   contexto preparado. Esta elección sustituye el endpoint remoto de codegraph.ru
   usado en la preparación inicial.
-- Las reglas de Ponytail se aplican con el plugin local. El nivel inicial es
-  `lite`; `/ponytail` sin argumento usa `full`, y `/ponytail lite|full|ultra|off`
-  lo cambia solo en esa sesión.
+- Las reglas de Ponytail se aplican con el plugin oficial. La instalación activa
+  `lite`; `/ponytail` sin argumento conserva el nivel activo, y
+  `/ponytail lite|full|ultra|off` cambia el nivel compartido entre conversaciones.
 - La statusline de subagentes vive en `templates/plugins/subagent-statusline.v2/`
   y se registra en `cli.json` como plugin de TUI; no consume contexto del modelo y
   solo muestra información en la interfaz.
@@ -206,7 +207,7 @@ el uso normal de la TUI por SSH.
   pertinentes. `skill-governance` queda disponible para carga explícita, pero
   `opencode/autoinvoke: false` la omite del catálogo del modelo.
 - La política de skills deniega IDs no administrados y vuelve a permitir las
-  integradas `opencode`/`report` y las cuatro fijadas. Para una skill propia de un
+  integradas `opencode`/`report`, las cuatro fijadas y las seis de Ponytail. Para una skill propia de un
   proyecto hay que añadir una regla `skill` explícita en su configuración.
 - `playwright-cli` usa perfiles en memoria por defecto. No adjuntes el navegador
   personal ni uses persistencia/estado de autenticación salvo necesidad expresa;
@@ -233,24 +234,25 @@ autorización general de shell a todos los proyectos.
 
 ### Ponytail y PONYTAIL_DEFAULT_MODE
 
-El plugin local (`~/.config/opencode/plugins/ponytail/`) respeta esta precedencia
-para el nivel inicial: `PONYTAIL_DEFAULT_MODE` → opción `defaultMode` del plugin
-(`lite`) → `lite`. El instalador establece `lite` también en el entorno de shell,
-actualizando una asignación previa y guardando el archivo anterior como
-`ponytail-env` dentro del respaldo:
+El plugin oficial lee primero `~/.config/opencode/.ponytail-active`. Si falta o
+no contiene un nivel válido, resuelve `PONYTAIL_DEFAULT_MODE` →
+`~/.config/ponytail/config.json` (`defaultMode`) → `full`.
+Las rutas respetan `XDG_CONFIG_HOME`. El instalador fija `lite` en ambos archivos
+y en la shell, guardando los valores anteriores en el respaldo:
 
 - zsh: `~/.zshenv` (o `$ZDOTDIR/.zshenv`)
 - bash: `~/.bashrc`
 - otros: `~/.profile`
 
-Si el archivo es un enlace a tus dotfiles, se escribe en el destino. Abre una
-shell nueva (o reinicia el servicio) para que el entorno la reciba. Para cambiar
-el nivel por defecto, edita esa línea o la opción del plugin en `opencode.jsonc`.
+No hace falta iniciar un chat para dejarlo activo. Para cambiar el nivel desde
+la terminal, sin consumir tokens ni reiniciar OpenCode:
 
-Nota: si usas además Ponytail con otro agente, su resolución upstream es
-`PONYTAIL_DEFAULT_MODE` → `~/.config/ponytail/config.json` → `full`. Una
-configuración propia con `defaultMode: off` no afecta al plugin local, pero la
-variable de entorno sí la anula en esos agentes.
+```sh
+printf 'lite\n' > "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/.ponytail-active"
+```
+
+Sustituye `lite` por `full`, `ultra` u `off`. Se lee en la siguiente petición y
+se comparte entre sesiones. Cambiar solo `defaultMode` no pisa un nivel activo.
 
 ### Herdr opcional
 

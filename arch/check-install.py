@@ -82,9 +82,9 @@ exec "{real_mv}" "$@"
 ''')
         move.chmod(0o755)
         install_dir = Path(env["XDG_DATA_HOME"]) / "opencode-dotfiles-v2"
-        engram = install_dir / "bin/engram-2.0.0"
+        engram = install_dir / "bin/engram-3.6.1"
         engram.parent.mkdir(parents=True)
-        engram.write_text('#!/bin/sh\n[ "$*" = version ] || exit 1\necho "engram 2.0.0"\n')
+        engram.write_text('#!/bin/sh\n[ "$*" = version ] || exit 1\necho "engram 3.6.1"\n')
         engram.chmod(0o755)
         playwright_package = install_dir / "tools/playwright-cli-0.1.21/node_modules/@playwright/cli"
         playwright_package.mkdir(parents=True)
@@ -118,6 +118,9 @@ exec "{real_mv}" "$@"
             config_dir.mkdir()
         (config_dir / "previous-profile").write_text("conservar")
         (config_dir / "service.json").write_text(json.dumps({"hostname": "0.0.0.0", "port": 4197}))
+        ponytail_config = Path(env["XDG_CONFIG_HOME"]) / "ponytail/config.json"
+        ponytail_config.parent.mkdir()
+        ponytail_config.write_text(json.dumps({"defaultMode": "off", "quietStartup": True}))
         previous = ""
         for installation in range(2):
             before = target.read_text()
@@ -134,6 +137,10 @@ exec "{real_mv}" "$@"
                     assert (config_target / "previous-profile").read_text() == "conservar"
             assert (backup / "shellrc").read_text().startswith(before)
             assert (backup / "ponytail-env").exists()
+            assert (backup / "ponytail-config.json").exists()
+            assert json.loads(ponytail_config.read_text()) == {"defaultMode": "lite", "quietStartup": True}
+            assert (config_dir / ".ponytail-active").read_text().strip() == "lite"
+            assert not (config_dir / "plugins/ponytail").exists()
             assert rc.is_symlink()
             assert "export PONYTAIL_DEFAULT_MODE=lite" in env_file.read_text()
             managed_path = 'export PATH="${XDG_DATA_HOME:-$HOME/.local/share}/opencode-dotfiles-v2/bin:$PATH"'
@@ -193,6 +200,19 @@ exec "{real_mv}" "$@"
         assert result.returncode != 0
         assert snapshot == {str(p.relative_to(config_dir)): p.read_bytes() for p in config_dir.rglob("*") if p.is_file()}
         assert target.read_text() == before
+
+        # La configuración global Ponytail inválida falla antes del despliegue.
+        ponytail_before = ponytail_config.read_text()
+        backups = set((install_dir / "backups").iterdir())
+        for content in ("{ JSON inválido", "[]"):
+            ponytail_config.write_text(content)
+            result = subprocess.run(["bash", str(root / "arch/install.sh"), "--no-start"],
+                                    env=env, cwd=home, capture_output=True, text=True)
+            assert result.returncode != 0
+            assert backups == set((install_dir / "backups").iterdir())
+            assert snapshot == {str(p.relative_to(config_dir)): p.read_bytes() for p in config_dir.rglob("*") if p.is_file()}
+            assert target.read_text() == before
+        ponytail_config.write_text(ponytail_before)
 
         # JSON inválido y un tipo CLI incorrecto fallan antes de tocar perfil/rc.
         broken = home / "broken repo"

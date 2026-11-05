@@ -1,6 +1,7 @@
 # Fuentes primarias y procedencia
 
-Consultadas el **20-09-2026**. Las URLs sustituyen las citas opacas `turn…` del
+Consultadas inicialmente el **20-09-2026**; Engram y Ponytail actualizados el
+**03-11-2026**. Las URLs sustituyen las citas opacas `turn…` del
 informe original. Los hechos del runtime se detallan en [verificacion.md](verificacion.md).
 
 ## OpenCode V2
@@ -26,36 +27,31 @@ implementación usa directorios de paquete en lugar de copiar esos ejemplos lite
 
 ## Engram
 
-- [Release estable v2.0.0](https://github.com/Gentleman-Programming/engram/releases/tag/v2.0.0),
-  publicada 18-09-2026. GitHub API: `prerelease=false`, `draft=false`.
-- [Política de releases](https://github.com/Gentleman-Programming/engram/blob/v2.0.0/docs/RELEASE-POLICY.md):
-  recomienda la última estable; RC no es el canal de producción.
-- [Instalación oficial](https://github.com/Gentleman-Programming/engram/blob/v2.0.0/docs/INSTALLATION.md):
-  binarios Linux sin dependencias de runtime. Algunas líneas aún llaman estable a
-  v1.20.0; la política y las notas de la release 2.0.0 aclaran el estado vigente.
-- [Plugin upstream](https://github.com/Gentleman-Programming/engram/blob/v2.0.0/plugin/opencode/engram.ts):
-  usa API V1. La propia release lista [#1220](https://github.com/Gentleman-Programming/engram/issues/1220)
-  como limitación; el adaptador V2 de este repositorio es **local**, no oficial.
-- [Catálogo e instrucciones MCP](https://github.com/Gentleman-Programming/engram/blob/v2.0.0/internal/mcp/mcp.go):
-  perfil agent, `mem_context`, registro de sesión, instrucciones proactivas.
-- [Atribución de sesiones #1242](https://github.com/Gentleman-Programming/engram/issues/1242).
-- [Checksums oficiales](https://github.com/Gentleman-Programming/engram/releases/download/v2.0.0/checksums.txt).
-- Código inspeccionado: commit `f912af998dcbb5c32ea81a17be00123ad49efd33` de la etiqueta v2.0.0.
-- Context7 `/gentleman-programming/engram` se usó para localizar documentación;
-  sus fragmentos de setup V1 se contrastaron con el código y las notas de release.
+- [Release estable v3.6.1](https://github.com/Gentleman-Programming/engram/releases/tag/v3.6.1),
+  publicada 03-11-2026: correcciones de sesiones, sincronización, búsquedas y Unicode.
+- [Soporte OpenCode 2.x desde 3.0.0](https://github.com/Gentleman-Programming/engram/releases/tag/v3.0.0).
+- [Plugin upstream V1/V2](https://github.com/Gentleman-Programming/engram/blob/v3.6.1/plugin/opencode/engram.ts):
+  ofrece `server` y `setup`. Conservamos la política local para evitar la captura
+  automática de prompts y los guardados obligatorios después de compactar.
+- [Política de actualización y rollback](https://github.com/Gentleman-Programming/engram/blob/v3.6.1/docs/RELEASE-POLICY.md):
+  respaldo y validación antes de adoptar un nuevo core.
+- [Checksums oficiales](https://github.com/Gentleman-Programming/engram/releases/download/v3.6.1/checksums.txt).
+- Contrato MCP comprobado contra el binario: 23 herramientas en `--tools=agent`,
+  `mem_save.capture_prompt`, `mem_context.compact/max_bytes`,
+  `mem_session_start.directory` y `mem_update.expected_project`.
 
 SHA-256 fijados en `arch/install.sh`:
 
 ```text
-23be1c2ce9739c455097ff864736213717b925b3e8821a988dfc619685a5abd5  engram_2.0.0_linux_amd64.tar.gz
-a942e73ab424faaa6e2785d1563e0d9d7f20739944dae0c50071223301d44333  engram_2.0.0_linux_arm64.tar.gz
+b06d6436ce5c7f1e838b9ec454870e7ec9e5b3e0f89b6edc5e5d2e41fe13edcf  engram_3.6.1_linux_amd64.tar.gz
+14fce398ebdaed8b11d6116f4c14795f77ed5d160e74de0ae3f9a77a01e390bc  engram_3.6.1_linux_arm64.tar.gz
 ```
 
 ## Otros componentes
 
 | Componente | Fuente y procedencia |
 | --- | --- |
-| Ponytail | [4.10.0](https://github.com/DietrichGebert/ponytail/tree/1d95ff7d39de12d87014ea40d4e22201bddc501b), entrypoint `.opencode/plugins/ponytail.mjs` con hooks V1; adaptación local V2 restaurada (sin npm) y resolución de `PONYTAIL_DEFAULT_MODE` en `hooks/ponytail-config.js`: entorno → `~/.config/ponytail/config.json` → `full` |
+| Ponytail | [5.3.3 oficial](https://github.com/DietrichGebert/ponytail/releases/tag/v5.3.3), npm `@dietrichgebert/ponytail@5.3.3`; API V2 `setup`, instrucciones en contexto/compactación y seis comandos/skills. Nivel compartido en `.ponytail-active`, default de entorno/configuración. MIT. Integridad npm: `sha512-Gq0ESMi1ZkcY+dvH1dyhOzR3+pYQ/LGW39E4dExcCzhaLe1AMPE43sPrW/JbEiaC986dUWeSzs97WfTABLkdDg==` |
 | Context7 | [Repositorio oficial](https://github.com/upstash/context7), [MCP/otros clientes](https://context7.com/docs/resources/all-clients); se registra solo `https://mcp.context7.com/mcp`, sin ejecutar el setup que añade skills |
 | Skills OpenCode V2 | [Descubrimiento, carga diferida, permisos y `autoinvoke`](https://opencode.ai/v2/docs/skills) |
 | frontend-design | [`anthropics/skills` en commit fijado](https://github.com/anthropics/skills/tree/34040c9c568585f6929bedeaad110ad08f079624/skills/frontend-design), Apache-2.0; se conservan `SKILL.md` y licencia sin cambios |
@@ -66,8 +62,8 @@ a942e73ab424faaa6e2785d1563e0d9d7f20739944dae0c50071223301d44333  engram_2.0.0_l
 | CodeGraph del informe | [Adaptador OpenCode](https://codegraph.ru/docs/en/integrations/OPENCODE_PLUGIN.html), todavía con hooks V1; no instalado |
 | CodeGraph MCP histórico | [Autenticación remota oficial](https://codegraph.ru/docs/en/integrations/REMOTE_MCP_AUTH.html); endpoint usado en la preparación inicial, sustituido el 27-09-2026 por la entrada local desactivada `codegraph serve --mcp` elegida por el usuario |
 
-Engram, Ponytail y statusline se distribuyen como adaptaciones locales y no se
-actualizan mediante npm. Engram no sustituye todas las funciones del plugin
+La política Engram y la statusline son locales. Ponytail usa el paquete oficial
+fijado en la configuración. Engram no sustituye todas las funciones del plugin
 oficial. Al actualizar OpenCode o Engram hay que validar hooks, instrucciones MCP
 y parámetros. Las fuentes de permisos, modelos y acceso SSH están en el
 [contraste actualizado](contraste-dotfiles.md#fuentes).

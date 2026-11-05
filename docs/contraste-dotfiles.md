@@ -226,23 +226,24 @@ no se copian: el comportamiento V2 se contrastó con su fuente y catálogo real.
 
 ### Configuración aplicada tras la elección del usuario
 
-La configuración actual aplica compactación cercana a 350k también a Astra,
-además de Sol/Terra/Luna, aceptando el consumo asociado:
+Desde el 03-11-2026, la configuración aplica estos presupuestos a GPT-6 Astra,
+GPT-6.1 Sol, GPT-6.1 Terra y GPT-6 Luna, aceptando el consumo asociado:
 
 | Modelo | `context` | `input` | `output` | Compactación aproximada |
 | --- | ---: | ---: | ---: | ---: |
-| Astra | 500.000 | 370.000 | 128.000 | 350.000 |
-| Sol | 500.000 | 370.000 | 128.000 | 350.000 |
-| Terra y Terra Fast | 500.000 | 370.000 | 128.000 | 350.000 |
-| Luna y Luna Fast | 500.000 | 370.000 | 128.000 | 350.000 |
+| GPT-6 Astra y Astra Fast | 550.000 | 420.000 | 128.000 | 400.000 |
+| GPT-6.1 Sol y Sol Fast | 700.000 | 570.000 | 128.000 | 550.000 |
+| GPT-6.1 Terra y Terra Fast | 600.000 | 470.000 | 128.000 | 450.000 |
+| GPT-6 Luna y Luna Fast | 500.000 | 370.000 | 128.000 | 350.000 |
 
-`370000 - 20000 = 350000`. El contexto de 500k permite 370k de entrada más 128k
+En estos presupuestos, el umbral es `input - 20000`; por ejemplo,
+`570000 - 20000 = 550000` para Sol. Cada contexto permite su entrada más 128k
 de salida sin anunciar una ventana innecesariamente grande.
 
 Son presupuestos operativos elegidos, no un óptimo medido. Los IDs `-fast` son
-entradas independientes. Desde la sincronización del 27-09-2026, GPT-6 Astra Fast,
-Sol Fast y Luna Fast tienen también el presupuesto 500k/370k/128k de la tabla.
-Esto sustituye la decisión anterior de dejar Astra Fast y Sol Fast sin override.
+entradas independientes y reciben el mismo presupuesto que su modelo estándar.
+GPT-5.6 Terra/Luna y sus variantes Fast quedan con `disabled: true`: borrar solo
+sus overrides permitiría que reaparecieran desde el catálogo del proveedor.
 La fuente de configuración es
 [`templates/opencode.jsonc`](../templates/opencode.jsonc), con estos ajustes:
 
@@ -260,6 +261,11 @@ La fuente de configuración es
 genere 128k. La reserva que usa el cálculo de compactación está limitada a 32k.
 Reducir la salida a unos pocos miles puede truncar razonamiento o parches y no
 es la primera palanca para ahorrar.
+
+Para suscripciones, OpenAI documenta 500k de contexto por defecto en GPT-6.1 Sol
+y elimina su recargo por contexto largo sobre la cuota incluida. Esto no elimina
+el consumo de cuota ni garantiza los mismos términos para Astra, Terra o Luna.
+Los presupuestos locales tampoco amplían los límites reales de la cuenta.
 
 ### Ajustes que acompañan al contexto
 
@@ -387,10 +393,13 @@ el instalador al HOME real ni se reinició el servicio de esta sesión.
   [modelos V2](https://opencode.ai/v2/docs/models) y
   [servicio web](https://opencode.ai/v2/docs/cli/web).
 - [Astra](https://developers.openai.com/api/docs/models/gpt-6-astra),
-  [Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol),
-  [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna),
-  [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra) y
+  [Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol),
+  [Luna](https://developers.openai.com/api/docs/models/gpt-6-luna),
+  [Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra) y
   [catálogo público](https://models.dev/api.json): límites anunciados.
+- [ChatGPT Work y Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex)
+  y [consumo de suscripción](https://developers.openai.com/codex/pricing):
+  contexto predeterminado de Sol y condiciones de la cuota incluida.
 - [Guía de Astra](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra):
   retirada de `temperature`/`top_p` y conservación del razonamiento efectivo.
 - [Modelos Codex](https://developers.openai.com/codex/models): disponibilidad según

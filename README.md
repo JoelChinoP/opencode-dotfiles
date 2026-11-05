@@ -1,8 +1,8 @@
 # opencode-dotfiles-v2
 
-Perfil limpio de **OpenCode V2 para Arch Linux**, con Engram, Ponytail y la
-statusline como plugins locales. Versiones de referencia: OpenCode 2.0.15 y
-Engram 2.0.0.
+Perfil de **OpenCode V2 para Arch Linux**, con Engram, Ponytail oficial y
+statusline local. Versiones de referencia: OpenCode **2.2.0**, Engram **3.6.1**
+y Ponytail **5.3.3**.
 
 | Integración | Estado |
 | --- | --- |
@@ -10,33 +10,33 @@ Engram 2.0.0.
 | Engram MCP local | Activado; memoria crítica y contexto limitado |
 | CodeGraph MCP local | `codegraph serve --mcp`, desactivado por defecto |
 | Engram local V2 | Política crítica y guía de compactación |
-| Ponytail local V2 | Reglas por turno en `lite`; `/ponytail full` cambia el modo y lo confirma con un aviso en la TUI de la sesión |
+| Ponytail oficial V2 | Paquete npm 5.3.3 fijado; `lite` automático y nivel persistente entre conversaciones |
 | subagent-statusline.v2 local | Estado y navegación de subagentes en la TUI |
 | Herdr | Integración oficial automática si ya está instalado, estable >= 0.9.1 |
 | Skills documentales y diseño | `document-files` local y `frontend-design` fijada |
 | Navegador | Skill y `@playwright/cli@0.1.21` fijados; Chromium del sistema |
 | Gobernanza de skills | Catálogo permitido y mantenimiento manual no autoinvocable |
 
-Desde la pantalla inicial, `/ponytail` muestra un aviso para iniciar un chat y
-permanece en el inicio. Dentro de una sesión, cambia el modo y confirma el resultado.
-El panel derecho muestra el modo efectivo (`lite`, `full`, `ultra` u `off`),
-incluidas las sesiones retomadas. El comando se registra una sola vez en la TUI;
-los cambios y la consulta del estado usan el RPC del plugin servidor.
+Ponytail queda activado en `lite` durante la instalación, sin iniciar un chat ni
+enviar un mensaje para configurarlo. El plugin oficial sustituye el antiguo
+adaptador y su panel TUI. Registra seis comandos y skills propios.
 
 Uso recomendado: `lite` como base diaria, incluidas revisiones normales;
 `/ponytail full` para implementación o refactorización con énfasis en soluciones
 mínimas, y `/ponytail lite` para volver. No hay cambios automáticos de nivel.
-Las sesiones nuevas empiezan en `lite`; las retomadas conservan su selección.
-La TUI muestra una sola línea: `Ponytail · lite/full/ultra/off`.
+El nivel elegido se comparte entre conversaciones mediante
+`~/.config/opencode/.ponytail-active`. `/ponytail` sin argumentos conserva el
+nivel si ya está activo. El default global se fija también en
+`~/.config/ponytail/config.json` como `"defaultMode": "lite"`.
 
 - `/ponytail-review [commit, rama o archivos]`: revisión puntual de cambios;
   sin argumentos revisa los cambios sin confirmar.
 - `/ponytail-audit [directorio o módulo]`: auditoría del alcance indicado;
   sin argumentos analiza el repositorio actual.
 
-Son procedimientos locales bajo demanda, de solo lectura y sin cambiar el modo.
-Sus instrucciones se envían únicamente al invocarlos. `/review` nativo sigue
-disponible. Las plantillas viven en `templates/commands/`.
+Se añaden `/ponytail-debt`, `/ponytail-gain` y `/ponytail-help`. `/review` nativo
+sigue disponible. `templates/commands/` conserva las variantes locales en español
+de review/audit como overrides opcionales; el instalador usa los comandos oficiales.
 
 ## Instalar
 
@@ -70,7 +70,7 @@ directorio del proyecto. V2 ya descubre/inicia un servicio separado de la termin
   global; no hay un `autoaccept` de TUI por proyecto.
 - Preferencias TUI: tema oscuro, razonamiento oculto, contadores de tokens,
   `prompt.editor: false` y navegación de páginas con `<leader>k` / `<leader>j`.
-- Solo se anuncian las skills integradas permitidas y las tres administradas;
+- Solo se anuncian las skills integradas permitidas, las administradas y las seis de Ponytail;
   otras copias globales o de compatibilidad quedan ocultas hasta autorizarlas.
 - Se prioriza código fuente; leer dependencias y artefactos requiere confirmación.
   La búsqueda se acota por instrucciones, no mediante `watcher.ignore`.
@@ -78,9 +78,10 @@ directorio del proyecto. V2 ya descubre/inicia un servicio separado de la termin
 - Títulos: `agents.title.model` usa `opencode/big-pickle`, gratuito y disponible
   desde octubre de 2025. El catálogo lo admite, pero la prueba real con V2.0.8
   recibe HTTP 403 de Zen; véase [verificación](docs/verificacion.md).
-- Sol de GPT-6.1, Astra/Luna de GPT-6, incluidas sus variantes Fast, y Terra/Luna de GPT-5.6
-  compactan aproximadamente a 350k (`input: 370000`, buffer de 20k).
-  Se conservan 30k recientes. Detalles y fuentes en el
+- GPT-6.1 Sol compacta aproximadamente a 550k, GPT-6 Astra a 400k,
+  GPT-6.1 Terra a 450k y GPT-6 Luna a 350k, incluidas sus variantes Fast.
+  El buffer es de 20k y se conservan 30k recientes. Terra/Luna de GPT-5.6
+  están deshabilitados también en el selector. Detalles y fuentes en el
   [análisis de contexto y consumo](docs/contraste-dotfiles.md#3-modelos-y-compactación).
 
 ## Subagentes
@@ -115,6 +116,8 @@ prioridad y duración.
   y export de `PONYTAIL_DEFAULT_MODE=lite`, más atajos en Bash/Zsh.
 - `arch/verify.sh`: comprobaciones locales; `--live` comprueba el servicio y MCPs.
 - `arch/check.mjs`: pruebas de los plugins, sin modelos ni red externa.
+- `arch/check-ponytail.mjs /ruta/paquete`: prueba el paquete oficial descargado en
+  un XDG temporal, incluido `lite` automático sin conversación y persistencia global.
 - `arch/check-install.py`: instalación y atajos en HOME/XDG aislados, con binarios simulados.
 - `arch/check-documents.sh`: smoke DOCX/PDF con las herramientas nativas.
 - [docs/contraste-dotfiles.md](docs/contraste-dotfiles.md): comparación con el repositorio

@@ -1,4 +1,4 @@
-// Adaptador V2 local para Engram 2.0.0. No instala el adaptador oficial de V1.
+// Política V2 local para Engram 3.6.1, sin captura automática del adaptador oficial.
 // ponytail: gate semántico por instrucciones; añadir cuotas externas si se necesita enforcement auditable.
 const policy = `Engram — memoria crítica, no registro de actividad.
 No busques al empezar cada tarea ni guardes al terminar cada respuesta.
@@ -28,9 +28,12 @@ Guarda solo conocimiento durable: +3 valor entre sesiones, +3 decisión/contrato
 Usa topic_key estable; actualiza un ID conocido con mem_update. No guardes prompts,
 logs crudos, secretos, cambios triviales ni resultados de tests. No consultes para
 confirmar un save exitoso. Ignora recordatorios temporales que no superen este gate.
+mem_update requiere expected_project: usa el propietario confirmado del recuerdo,
+no el proyecto inferido del directorio actual ni un valor inventado.
 Antes de la primera escritura significativa registra una vez la sesión mediante
 mem_session_start usando el ID real indicado abajo; utiliza ese session_id en saves
-y summaries. Ante identidad de proyecto ambigua, resuélvela; no inventes un proyecto.
+y summaries. Pasa directory con el directorio absoluto de esta sesión al registrarla.
+Ante identidad de proyecto ambigua, resuélvela; no inventes un proyecto.
 mem_session_summary solo al cerrar trabajo significativo o para un traspaso durable
 que el contexto no conserve: objetivo, decisiones, archivos, pendientes y verificación.
 Cierra con mem_session_end la sesión registrada cuando realmente finalice, no cada turno.
@@ -43,8 +46,7 @@ export default {
   id: "engram",
   async setup(ctx) {
     await ctx.session.hook("context", (event) => {
-      // Engram 2.0.0 también exige saves incondicionales en initialize.instructions.
-      // Sustituir esa sección evita dos protocolos contradictorios en cada turno.
+      // Sustituir initialize.instructions evita protocolos de memoria contradictorios.
       for (const part of event.system) {
         if (part.type !== "text") continue;
         part.text = part.text.replace(

@@ -10,9 +10,7 @@ case "${1:-}" in
   *) echo 'Uso: bash arch/verify.sh [--live | --config-dir DIR]' >&2; exit 2 ;;
 esac
 for script in "$root"/arch/*.sh; do bash -n "$script"; done
-for plugin in engram ponytail; do node --check "$config_dir/plugins/$plugin/index.js"; done
-for file in rpc.js ui.js; do node --check "$config_dir/plugins/ponytail/$file"; done
-test -f "$config_dir/plugins/ponytail/tui.tsx"
+node --check "$config_dir/plugins/engram/index.js"
 python -I - "$config_dir" <<'PY'
 import hashlib, json, os, pathlib, shutil, subprocess, sys
 root = pathlib.Path(sys.argv[1])
@@ -35,17 +33,16 @@ for action, resource, effect in (
     ("engram_mem_save_prompt", "*", "deny"), ("engram_mem_capture_passive", "*", "deny"),
 ):
     assert {"action": action, "resource": resource, "effect": effect} in rules
-for skill_id in ("opencode", "report", "document-files", "frontend-design", "playwright-cli", "skill-governance"):
+for skill_id in ("opencode", "report", "document-files", "frontend-design", "playwright-cli", "skill-governance", "ponytail", "ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help"):
     assert {"action": "skill", "resource": skill_id, "effect": "allow"} in rules
 assert {"action": "skill", "resource": "*", "effect": "deny"} in rules
 assert "./plugins/engram" in config["plugins"]
-ponytail = next(entry for entry in config["plugins"] if isinstance(entry, dict) and entry.get("package") == "./plugins/ponytail")
-assert ponytail["package"] == "./plugins/ponytail"
-assert ponytail["options"]["defaultMode"] == "lite"
-for name in ("engram", "ponytail"):
-    plugin = root / "plugins" / name
-    manifest = json.loads((plugin / "package.json").read_text())
-    assert (plugin / manifest.get("exports", {}).get(".", "./index.js")).is_file(), name
+assert "@dietrichgebert/ponytail@5.3.3" in config["plugins"]
+assert not (root / "plugins/ponytail").exists(), "Retira el adaptador antiguo para evitar dos Ponytail"
+assert (root / ".ponytail-active").read_text().strip() in {"lite", "full", "ultra", "off"}
+plugin = root / "plugins/engram"
+manifest = json.loads((plugin / "package.json").read_text())
+assert (plugin / manifest.get("exports", {}).get(".", "./index.js")).is_file()
 cli = json.loads((root / "cli.json").read_text())
 assert cli["session"]["permissions"] == "prompt"
 turn_tokens = cli.get("debug", {}).get("turn_tokens", False)
@@ -107,8 +104,8 @@ assert "0.1.21" in playwright_version, playwright_version
 
 binary = servers["engram"]["command"][0]
 version = subprocess.check_output([binary, "version"], text=True, timeout=15).strip()
-assert version == "engram 2.0.0", version
-print("OK: configuración V2, cuatro skills fijadas, Playwright CLI, plugins, TUI y Engram 2.0.0.")
+assert version == "engram 3.6.1", version
+print("OK: configuración V2, cuatro skills fijadas, Playwright CLI, Ponytail 5.3.3 y Engram 3.6.1.")
 PY
 if $live; then
   opencode service status
@@ -129,6 +126,7 @@ for attempt in range(30):
     ready = plugins.get("engram") == "active" and plugins.get("ponytail") == "active"
     ready = ready and servers == {"context7": "connected", "engram": "connected", "codegraph": "disabled"}
     ready = ready and {"document-files", "frontend-design", "playwright-cli", "skill-governance"} <= set(skills)
+    ready = ready and {"ponytail", "ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help"} <= set(skills)
     ready = ready and skills.get("skill-governance", {}).get("autoinvoke") is False
     if ready:
         break

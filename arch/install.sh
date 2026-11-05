@@ -47,22 +47,22 @@ trap cleanup EXIT
 
 # Versión estable fijada: actualizar versión y checksums juntos tras verificar.
 case "$(uname -m)" in
-  x86_64) arch=amd64; checksum=23be1c2ce9739c455097ff864736213717b925b3e8821a988dfc619685a5abd5 ;;
-  aarch64) arch=arm64; checksum=a942e73ab424faaa6e2785d1563e0d9d7f20739944dae0c50071223301d44333 ;;
+  x86_64) arch=amd64; checksum=b06d6436ce5c7f1e838b9ec454870e7ec9e5b3e0f89b6edc5e5d2e41fe13edcf ;;
+  aarch64) arch=arm64; checksum=14fce398ebdaed8b11d6116f4c14795f77ed5d160e74de0ae3f9a77a01e390bc ;;
   *) echo 'Arquitectura sin binario Engram verificado.' >&2; exit 1 ;;
 esac
-engram="$install_dir/bin/engram-2.0.0"
+engram="$install_dir/bin/engram-3.6.1"
 if [[ ! -x $engram ]]; then
-  archive="engram_2.0.0_linux_${arch}.tar.gz"
+  archive="engram_3.6.1_linux_${arch}.tar.gz"
   curl --fail --location --silent --show-error --retry 2 --connect-timeout 15 --max-time 180 \
-    "https://github.com/Gentleman-Programming/engram/releases/download/v2.0.0/$archive" -o "$stage/$archive"
+    "https://github.com/Gentleman-Programming/engram/releases/download/v3.6.1/$archive" -o "$stage/$archive"
   printf '%s  %s\n' "$checksum" "$stage/$archive" | sha256sum --check --status
   tar -xzf "$stage/$archive" -C "$stage" engram
   install -m 755 "$stage/engram" "$engram"
   rm -- "$stage/$archive" "$stage/engram"
 fi
 
-[[ $("$engram" version) == 'engram 2.0.0' ]] || { echo 'Binario Engram inválido.' >&2; exit 1; }
+[[ $("$engram" version) == 'engram 3.6.1' ]] || { echo 'Binario Engram inválido.' >&2; exit 1; }
 
 # Playwright CLI queda aislado del prefijo npm global. El lockfile fija también
 # playwright/playwright-core y --ignore-scripts evita hooks de instalación.
@@ -118,6 +118,7 @@ export PATH="$install_dir/bin:$PATH"
 
 cp "$root/templates/opencode.jsonc" "$root/templates/cli.json" "$root/templates/AGENTS.md" "$root/templates/skills-lock.json" "$stage/"
 cp -R "$root/templates/plugins" "$root/templates/skills" "$stage/"
+printf 'lite\n' > "$stage/.ponytail-active"
 # La conexión al servicio pertenece al runtime, no al perfil de agentes.
 if [[ -f $config_dir/service.json ]]; then cp "$config_dir/service.json" "$stage/"; fi
 python -I - "$stage" "$engram" "$config_dir" <<'PY'
@@ -136,6 +137,14 @@ path.write_text(json.dumps(service, indent=2) + "\n")
 PY
 
 # Fallar antes de respaldar/mover el perfil o modificar los archivos de shell.
+python -I - "$config_home/ponytail/config.json" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+if path.exists():
+    config = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(config, dict):
+        raise SystemExit("La configuración global de Ponytail debe ser un objeto JSON")
+PY
 bash "$root/arch/verify.sh" --config-dir "$stage"
 node "$root/arch/check.mjs"
 
@@ -161,8 +170,19 @@ cleanup
 trap - EXIT
 printf 'Perfil instalado en %s\nRespaldo: %s\n' "$config_dir" "$backup"
 
-# Ponytail: nivel inicial `lite` en el entorno de la shell. El plugin local ya
-# usa lite por defecto; la variable también cubre a los agentes que la respetan.
+# Ponytail oficial: nivel persistente en OpenCode y default global, incluso
+# cuando el servicio ya estaba iniciado y no recibe el entorno de esta shell.
+mkdir -p "$config_home/ponytail"
+if [[ -f $config_home/ponytail/config.json ]]; then
+  cp -L -- "$config_home/ponytail/config.json" "$backup/ponytail-config.json"
+fi
+python -I - "$config_home/ponytail/config.json" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+config = json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
+config["defaultMode"] = "lite"
+path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+PY
 export PONYTAIL_DEFAULT_MODE=lite
 case "$(basename -- "${SHELL:-}")" in
   zsh) env_file="${ZDOTDIR:-$HOME}/.zshenv" ;;

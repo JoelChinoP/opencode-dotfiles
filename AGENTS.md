@@ -14,9 +14,11 @@
   la statusline de TUI se registra aparte en `templates/cli.json`. Herdr es
   opcional: el instalador vuelve a ejecutar su integración oficial después de
   desplegar el perfil cuando encuentra Herdr estable >= 0.9.1 en el PATH.
-- Mantén la adaptación local de Ponytail: el entrypoint upstream 4.10.0 usa
-  hooks V1. Su nivel inicial es `lite` (entorno `PONYTAIL_DEFAULT_MODE` antes que
-  opción del plugin); `/ponytail` sin argumento usa `full`.
+- Ponytail usa el paquete oficial `@dietrichgebert/ponytail@5.3.3`, con API V2.
+  El instalador fija `lite` en `ponytail/config.json` y `opencode/.ponytail-active`;
+  el nivel elegido se comparte entre sesiones. No reinstales el adaptador antiguo.
+- Engram usa el binario 3.6.1 y la política local V2 sin captura automática.
+  Al actualizar su versión, verifica checksums, migración en copia y contratos MCP.
 - Deja plantillas sin credenciales ni rutas personales: `arch/install.sh` escribe
   en el staging las rutas absolutas de Engram y skills y fuerza loopback en
   `service.json` antes de validar y reemplazar el perfil global. El instalador
