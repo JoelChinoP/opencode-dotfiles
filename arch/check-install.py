@@ -182,7 +182,7 @@ with (Path.home() / "npm-calls").open("a") as stream:
             cli = json.loads((config_dir / "cli.json").read_text())
             assert cli["session"]["permissions"] == "prompt"
             assert cli["debug"]["turn_tokens"] is True
-            assert cli["plugins"] == ["./plugins/subagent-statusline.v2", "./plugins/open-editor"] + (["./herdr-opencode"] if shell == "zsh" else [])
+            assert cli["plugins"] == ["./plugins/subagent-statusline.v2", "./plugins/open-editor", "./plugins/image-preview"] + (["./herdr-opencode"] if shell == "zsh" else [])
             if shell == "zsh":
                 assert (config_dir / "herdr-opencode/tui.js").is_file()
                 assert len((home / "herdr-calls").read_text().splitlines()) == installation + 1

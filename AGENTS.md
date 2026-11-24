@@ -11,7 +11,7 @@
 ## Perfil y despliegue
 
 - `templates/opencode.jsonc` registra los plugins de servidor Engram y Ponytail;
-  la statusline y el lanzador de editores de la TUI se registran en
+  la statusline, el lanzador de editores y `image-preview` de la TUI se registran en
   `templates/cli.json`. Tras desplegar el perfil, el instalador vuelve a ejecutar
   la integración oficial de Herdr si encuentra Herdr estable >= 0.9.1 en el PATH.
 - Ponytail usa el paquete oficial `@dietrichgebert/ponytail@5.3.3`, con API V2.

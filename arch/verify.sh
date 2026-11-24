@@ -49,7 +49,7 @@ assert cli["session"]["permissions"] == "prompt"
 turn_tokens = cli.get("debug", {}).get("turn_tokens", False)
 assert isinstance(turn_tokens, bool) or turn_tokens == "verbose", "debug.turn_tokens debe ser boolean o verbose"
 assert json.loads((root / "service.json").read_text())["hostname"] == "127.0.0.1"
-for entry in ("./plugins/subagent-statusline.v2", "./plugins/open-editor"):
+for entry in ("./plugins/subagent-statusline.v2", "./plugins/open-editor", "./plugins/image-preview"):
     assert entry in cli["plugins"], entry
     plugin = root / entry
     tui = json.loads((plugin / "package.json").read_text())["exports"]["./tui"]

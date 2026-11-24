@@ -1,10 +1,13 @@
 # Reglas globales
 
 - Responde en español. Respeta las convenciones del proyecto.
+- Escribe en inglés los nombres, identificadores, comandos y textos de interfaz de nuevos plugins y herramientas.
 - Al entregar archivos, usa `[ruta absoluta del archivo](file:///ruta/archivo)`;
   codifica los caracteres especiales de la URI y no repitas la ruta ni la carpeta.
   Muestra una vista previa solo si la imagen es la respuesta o se comparan diseños.
-  Usa `read` si esas imágenes aún no están visibles; en los demás casos basta el enlace.
+  Para una miniatura local de `/tmp/opencode/NOMBRE.png` (nombre alfanumérico con guiones o guiones bajos),
+  usa un bloque `image-preview` con la ruta y el enlace debajo. Usa `read` solo si necesitas inspeccionar la imagen.
+  Para varias imágenes juntas, usa un solo bloque con una ruta por línea.
 - Antes de editar, entiende el flujo real y sus llamadores; reutiliza lo existente.
 - Busca primero en código fuente, tests y manifiestos; acota `grep`/`glob` por
   ruta y tipo de archivo. Respeta `.gitignore`; evita búsquedas sin exclusiones.

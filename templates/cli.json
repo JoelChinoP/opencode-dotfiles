@@ -6,7 +6,8 @@
   },
   "plugins": [
     "./plugins/subagent-statusline.v2",
-    "./plugins/open-editor"
+    "./plugins/open-editor",
+    "./plugins/image-preview"
   ],
   "diffs": {
     "wrap": "word"
