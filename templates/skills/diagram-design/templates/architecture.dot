@@ -1,0 +1,25 @@
+// Example only: replace entities and relationships with the actual system.
+digraph Delivery {
+  graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.45, ranksep=0.7,
+         fontname="Noto Sans", fontsize=16, splines=polyline,
+         label="Proceso de entrega · ejemplo", labelloc=t];
+  node [shape=box, style="rounded,filled", fillcolor="#EDF5F4", color="#28746A",
+        fontname="Noto Sans", fontsize=14, fontcolor="#183A37", margin="0.18,0.12"];
+  edge [fontname="Noto Sans", fontsize=11, fontcolor="#364954", color="#52716E", arrowsize=0.8];
+
+  source [label="Fuentes\nverificadas", shape=folder];
+  subgraph cluster_production {
+    label="Producción local";
+    color="#B9D3CF";
+    style=rounded;
+    draft [label="Contenido y\ncomposición"];
+    render [label="Archivo editable\ny renderizado"];
+    review [label="¿Contenido y diseño\ncorrectos?", shape=diamond, fillcolor="#FFF0D9", color="#946B2D"];
+    draft -> render [label="generar"];
+    render -> review [label="inspeccionar"];
+    review -> draft [label="no: corregir", style=dashed, constraint=false];
+  }
+  delivery [label="Entrega\ncon fuentes", fillcolor="#183A37", fontcolor="white"];
+  source -> draft [label="hechos y requisitos"];
+  review -> delivery [label="sí"];
+}

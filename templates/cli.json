@@ -5,7 +5,8 @@
     "mode": "dark"
   },
   "plugins": [
-    "./plugins/subagent-statusline.v2"
+    "./plugins/subagent-statusline.v2",
+    "./plugins/open-editor"
   ],
   "diffs": {
     "wrap": "word"
@@ -14,6 +15,7 @@
     "sidebar": "auto",
     "scrollbar": false,
     "thinking": "hide",
+    "image_preview": true,
     "permissions": "prompt"
   },
   "debug": {

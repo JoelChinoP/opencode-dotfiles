@@ -12,8 +12,10 @@ y Ponytail **5.3.3**.
 | Engram local V2 | Política crítica y guía de compactación |
 | Ponytail oficial V2 | Paquete npm 5.3.3 fijado; `lite` automático y nivel persistente entre conversaciones |
 | subagent-statusline.v2 local | Estado y navegación de subagentes en la TUI |
+| Editores locales | `/open-zed` y `/open-vscode` abren carpetas desde la TUI sin llamar al modelo |
 | Herdr | Integración oficial automática si ya está instalado, estable >= 0.9.1 |
-| Skills documentales y diseño | `document-files` local y `frontend-design` fijada |
+| Documentos, presentaciones y diagramas | `document-files`, `presentation-slides` y `diagram-design`; [arquitectura para presentar o editar](docs/calidad-visual.md) |
+| Desarrollo web | `frontend-design` para diseño visual; `modern-web-guidance` para HTML, CSS, APIs del navegador, accesibilidad y compatibilidad. Guías locales, sin telemetría |
 | Navegador | Skill y `@playwright/cli@0.1.21` fijados; Chromium del sistema |
 | Gobernanza de skills | Catálogo permitido y mantenimiento manual no autoinvocable |
 
@@ -62,6 +64,30 @@ Tras instalar, abre una terminal Bash/Zsh nueva: `oc` abre OpenCode y
 Por SSH, con el mismo usuario y HOME/XDG, se usan los mismos comandos en el
 directorio del proyecto. V2 ya descubre/inicia un servicio separado de la terminal.
 
+## Abrir la carpeta en un editor
+
+Ambos comandos piden una ventana nueva (`-n`) para conservar el proyecto que
+ya tengas abierto. Sin argumentos se abre la carpeta de la sesión activa. Para elegir una subcarpeta,
+escribe `@` y parte de su nombre. Con el selector abierto, `Enter` elige la carpeta;
+otro `Enter` ejecuta el comando. También puedes escribir la ruta relativa sin `@`
+(entre comillas si tiene espacios). Si el nombre empieza literalmente por `@`,
+puedes usar `./@equipo`.
+
+```text
+/open-zed
+/open-zed @templates/plugins
+/open-vscode "mi carpeta"
+/open-vscode @templates --profile "desarrollo web"
+```
+
+`--profile` también funciona sin carpeta. Busca entre los perfiles con nombre
+guardados por VS Code sin distinguir mayúsculas: `desarrollo web` encuentra
+`Desarrollo Web`. Si el nombre no existe, o coincide con varios y no es exacto,
+el comando avisa sin abrir el editor ni crear un perfil. Sin `--profile`, VS Code
+usa su asociación habitual. El plugin requiere `zed` o `code` en el `PATH` de la
+TUI y acceso local a la carpeta. La búsqueda de perfiles usa el catálogo local de
+VS Code estable para Linux (`Code/User/globalStorage/storage.json`).
+
 ## Permisos y contexto
 
 - Confirmaciones TUI en `prompt`; shell pide autorización salvo inspecciones Git
@@ -109,9 +135,9 @@ prioridad y duración.
 ## Archivos
 
 - `AGENTS.md`: reglas del proyecto y criterio de simplicidad para este repositorio.
-- `templates/`: configuración portable, reglas, plugins locales y cuatro skills
+- `templates/`: configuración portable, reglas, plugins locales y seis skills
   administradas. `skills-lock.json` fija procedencia, runtime y licencia;
-  `tools/playwright-cli/` contiene el lock npm exacto.
+  `tools/playwright-cli/` y `tools/presentations/` contienen los locks npm exactos.
 - `arch/install.sh`: requisitos, Engram oficial verificado, respaldo, despliegue
   y export de `PONYTAIL_DEFAULT_MODE=lite`, más atajos en Bash/Zsh.
 - `arch/verify.sh`: comprobaciones locales; `--live` comprueba el servicio y MCPs.
@@ -120,6 +146,10 @@ prioridad y duración.
   un XDG temporal, incluido `lite` automático sin conversación y persistencia global.
 - `arch/check-install.py`: instalación y atajos en HOME/XDG aislados, con binarios simulados.
 - `arch/check-documents.sh`: smoke DOCX/PDF con las herramientas nativas.
+- `arch/check-visuals.py`: DOCX editorial, PPTX editable, diagramas y regresiones de
+  validación; `--output DIR-NUEVO` conserva archivos para inspección visual.
+- [docs/calidad-visual.md](docs/calidad-visual.md): uso de las skills y protocolo de
+  comparación con Claude Code usando el mismo modelo y encargo.
 - [docs/contraste-dotfiles.md](docs/contraste-dotfiles.md): comparación con el repositorio
   anterior, propuesta de permisos y pendientes priorizados.
 - [docs/hallazgos.md](docs/hallazgos.md): correcciones al informe y decisiones.

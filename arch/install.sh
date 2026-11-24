@@ -14,17 +14,20 @@ esac
 [[ -f /etc/arch-release ]] || { echo 'Este instalador es para Arch Linux.' >&2; exit 1; }
 
 missing=()
-for command in opencode python node npm curl tar sha256sum git rg pandoc libreoffice pdfinfo pdftotext pdftoppm chromium; do
+for command in opencode python node npm curl tar sha256sum git rg pandoc libreoffice pdfinfo pdftotext pdftoppm chromium dot fc-match timeout; do
   command -v "$command" >/dev/null || missing+=("$command")
 done
 if ((${#missing[@]})); then
   printf 'Faltan comandos: %s\n' "${missing[*]}" >&2
-  echo 'Ejecuta: sudo pacman -Syu --needed opencode python nodejs npm curl tar coreutils git ripgrep pandoc libreoffice-still poppler chromium' >&2
+  echo 'Ejecuta: sudo pacman -Syu --needed opencode python nodejs npm curl tar coreutils git ripgrep pandoc libreoffice-still poppler chromium graphviz fontconfig noto-fonts' >&2
   exit 1
 fi
 [[ $(opencode --version) == 'opencode v2.'* ]] || { echo 'Se requiere OpenCode V2.' >&2; exit 1; }
 node_major="$(node -p 'Number(process.versions.node.split(".")[0])')"
-[[ $node_major =~ ^[0-9]+$ && $node_major -ge 20 ]] || { echo 'Playwright CLI requiere Node.js 20 o posterior.' >&2; exit 1; }
+[[ $node_major =~ ^[0-9]+$ && $node_major -ge 22 ]] || { echo 'Modern Web Guidance requiere Node.js 22 o posterior.' >&2; exit 1; }
+for font in 'Noto Sans' 'Noto Serif'; do
+  [[ $(fc-match -f '%{family}' "$font") == "$font" ]] || { echo "Falta $font: instala noto-fonts." >&2; exit 1; }
+done
 
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -115,6 +118,46 @@ EOF
 install -m 755 "$wrapper" "$install_dir/bin/playwright-cli"
 export PATH="$install_dir/bin:$PATH"
 [[ $(playwright-cli --version) == *"$playwright_version"* ]] || { echo 'Playwright CLI inválido.' >&2; exit 1; }
+
+web_src="$root/templates/tools/modern-web-guidance"
+web_dir="$install_dir/tools/modern-web-guidance-1.0.2"
+if [[ ! -x $web_dir/node_modules/.bin/modern-web-guidance ]] || ! cmp -s "$web_src/package-lock.json" "$web_dir/package-lock.json"; then
+  tool_work="$(mktemp -d "$install_dir/.modern-web-guidance.XXXXXXXX")"
+  cp "$web_src/"package*.json "$tool_work/"
+  npm ci --prefix "$tool_work" --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error
+  if [[ -e $web_dir || -L $web_dir ]]; then
+    mv -- "$web_dir" "$install_dir/backups/modern-web-guidance.invalid.$(date +%s).$$"
+  fi
+  mv -- "$tool_work" "$web_dir"
+  tool_work=''
+fi
+install -m 755 "$web_src/modern-web-guidance" "$install_dir/bin/modern-web-guidance"
+
+# El hash del lock identifica el runtime completo, incluidas sus transitivas.
+slides_lock="$(sha256sum "$root/templates/tools/presentations/package-lock.json")"
+slides_lock="${slides_lock%% *}"
+slides_dir="$install_dir/tools/presentations-$slides_lock"
+if [[ ! -f $slides_dir/node_modules/pptxgenjs/package.json ]]; then
+  tool_work="$(mktemp -d "$install_dir/.presentations.XXXXXXXX")"
+  cp "$root/templates/tools/presentations/"package*.json "$tool_work/"
+  npm ci --prefix "$tool_work" --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error
+  if [[ -e $slides_dir || -L $slides_dir ]]; then
+    mv -- "$slides_dir" "$install_dir/backups/presentations.invalid.$(date +%s).$$"
+  fi
+  mv -- "$tool_work" "$slides_dir"
+  tool_work=''
+fi
+node -e 'if (require(process.argv[1]).version !== "4.0.1") process.exit(1)' "$slides_dir/node_modules/pptxgenjs/package.json"
+cat >"$work/slides-node" <<EOF
+#!/bin/sh
+set -eu
+base="\$(CDPATH= cd -- "\$(dirname -- "\$0")/.." && pwd)"
+NODE_PATH="\$base/tools/presentations-$slides_lock/node_modules"
+export NODE_PATH
+exec node "\$@"
+EOF
+install -m 755 "$work/slides-node" "$install_dir/bin/slides-node"
+[[ $(slides-node -p 'new (require("pptxgenjs"))().version') == '4.0.1' ]] || { echo 'Runtime de presentaciones inválido.' >&2; exit 1; }
 
 cp "$root/templates/opencode.jsonc" "$root/templates/cli.json" "$root/templates/AGENTS.md" "$root/templates/skills-lock.json" "$stage/"
 cp -R "$root/templates/plugins" "$root/templates/skills" "$stage/"
@@ -268,5 +311,5 @@ if $start; then
   fi
   bash "$root/arch/verify.sh" --live
 else
-  echo 'Para activar: opencode service restart; después bash arch/verify.sh --live'
+  echo 'Perfil desplegado sin reiniciar; OpenCode recarga la configuración. Comprueba con arch/verify.sh --live desde un directorio sin configuración de proyecto.'
 fi

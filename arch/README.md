@@ -6,7 +6,7 @@ Ejecuta tú, si falta algún paquete:
 
 ```sh
 sudo pacman -Syu --needed opencode python nodejs npm curl tar coreutils git ripgrep \
-  pandoc libreoffice-still poppler chromium
+  pandoc libreoffice-still poppler chromium graphviz fontconfig noto-fonts
 opencode --version
 ```
 
@@ -14,8 +14,9 @@ Debe ser OpenCode **V2**; la instalación actual está verificada con `2.2.0`
 (las pruebas iniciales se hicieron con `2.0.8`). `pacman -Si opencode`
 permite comprobar la versión ofrecida por tu mirror. No se usa AUR ni paru.
 Python se usa con su biblioteca estándar y `-I`; no se activa ningún venv ni se
-instalan librerías globales. Node.js 20+ y npm instalan el runtime Playwright
-fijado por lockfile. No necesitas Bun, Go, SQLite CLI ni un compilador de TypeScript.
+instalan librerías globales. Node.js 22+ y npm instalan los runtimes Playwright,
+PptxGenJS y Modern Web Guidance fijados por lockfile. Graphviz renderiza los diagramas editables y Noto Sans/Serif
+son las fuentes de referencia. No necesitas Bun, Go, SQLite CLI ni TypeScript.
 
 `qpdf` y `tesseract` son capacidades documentales opcionales:
 
@@ -50,6 +51,20 @@ ${XDG_DATA_HOME:-$HOME/.local/share}/opencode-dotfiles-v2/tools/playwright-cli-0
 administrado utiliza `/usr/bin/chromium`; no descarga otro navegador. El directorio
 `bin/` administrado se añade al entorno de Bash/Zsh sin activar Python.
 
+`modern-web-guidance` **1.0.2** incluye buscador, guías y datos de compatibilidad
+locales. El wrapper desactiva la telemetría y los registros de uso. Para probarlo:
+
+```sh
+modern-web-guidance search "light dismiss dialog"
+modern-web-guidance retrieve light-dismiss-a-dialog
+```
+
+`slides-node` ejecuta generadores CommonJS con PptxGenJS **4.0.1** desde
+`tools/presentations-<sha256-del-lock>/`. El hash identifica también las dependencias
+transitivas; se instala con `npm ci --ignore-scripts`, sin modificar npm global.
+El wrapper limita `NODE_PATH` a esa ejecución. Un script de usuario puede ejecutar
+código normal de Node: se mantiene la autorización de shell por proyecto.
+
 ## 2. Desplegar el perfil
 
 Cierra las sesiones de OpenCode antes de activar el perfil. Si tienes un
@@ -66,8 +81,8 @@ El script realiza, en orden:
 
 1. Comprueba Arch, usuario sin root, comandos necesarios y versión de OpenCode.
 2. Descarga y verifica Engram antes de tocar la configuración existente.
-3. Instala el paquete Playwright fijado fuera del npm global y genera su wrapper
-   para Chromium del sistema.
+3. Instala Playwright, Modern Web Guidance y PptxGenJS fijados fuera del npm
+   global; publica los wrappers `playwright-cli`, `modern-web-guidance` y `slides-node`.
 4. Prepara plantillas, plugins y skills en un directorio temporal del mismo
    filesystem; fija `hostname: 127.0.0.1`.
 5. Valida JSON, skills, licencias/procedencia, paquetes, permisos, binarios y
@@ -100,14 +115,14 @@ Cada ejecución imprime el respaldo único bajo
 `${XDG_DATA_HOME:-$HOME/.local/share}/opencode-dotfiles-v2/backups/`.
 Reinstalar vuelve a aplicar las plantillas y crea otro respaldo; incorpora cambios
 permanentes a las plantillas o recupéralos después. No hay actualizaciones móviles:
-Engram, Ponytail, las skills y Playwright se cambian explícitamente con versión/commit y locks.
+Engram, Ponytail, las skills y los runtimes npm se cambian explícitamente con versión/commit y locks.
 
-Para separar despliegue y activación:
+Para desplegar sin reiniciar (OpenCode recarga configuración y skills):
 
 ```sh
 bash arch/install.sh --no-start
-opencode service restart
-bash arch/verify.sh --live
+# Desde un directorio sin configuración de proyecto:
+bash /ruta/al/repositorio/arch/verify.sh --live
 ```
 
 ## 3. Primer uso
@@ -203,11 +218,12 @@ el uso normal de la TUI por SSH.
 - La statusline de subagentes vive en `templates/plugins/subagent-statusline.v2/`
   y se registra en `cli.json` como plugin de TUI; no consume contexto del modelo y
   solo muestra información en la interfaz.
-- `document-files`, `frontend-design` y `playwright-cli` se anuncian cuando son
+- `document-files`, `presentation-slides`, `diagram-design`, `frontend-design` y
+  `playwright-cli` se anuncian cuando son
   pertinentes. `skill-governance` queda disponible para carga explícita, pero
   `opencode/autoinvoke: false` la omite del catálogo del modelo.
 - La política de skills deniega IDs no administrados y vuelve a permitir las
-  integradas `opencode`/`report`, las cuatro fijadas y las seis de Ponytail. Para una skill propia de un
+  integradas `opencode`/`report`, las seis fijadas y las seis de Ponytail. Para una skill propia de un
   proyecto hay que añadir una regla `skill` explícita en su configuración.
 - `playwright-cli` usa perfiles en memoria por defecto. No adjuntes el navegador
   personal ni uses persistencia/estado de autenticación salvo necesidad expresa;
@@ -314,6 +330,7 @@ anuncian mientras su ID no tenga una regla de permiso explícita.
 node arch/check.mjs
 python arch/check-install.py
 bash arch/check-documents.sh
+python -I arch/check-visuals.py --output /tmp/opencode/revision-visual-nueva
 bash arch/verify.sh
 bash arch/verify.sh --live
 ```
@@ -330,6 +347,13 @@ se conserva/restaura. Requiere ambas shells y las dependencias del instalador en
 `check-documents.sh` crea un DOCX desde Markdown, prueba el contenedor y su
 lectura, lo convierte con un perfil LibreOffice aislado, extrae y renderiza el
 PDF y usa `qpdf --check` cuando qpdf está disponible.
+
+`check-visuals.py` prueba la referencia editorial, numeración, preservación de
+archivos, gráfico/hoja de datos/notas nativos en PPTX, renderizado de tres slides y
+diagramas SVG/PNG/PDF. Inyecta una figura fuera del lienzo, una relación rota y una
+declaración de entidades XML para verificar rechazos. El directorio `--output`
+debe ser nuevo; abre sus imágenes para completar la revisión visual. El script
+no llama modelos y no acredita igualdad de paginación en Microsoft Office.
 
 Para validar una preparación sin tocar el perfil instalado:
 
@@ -365,6 +389,11 @@ Para actualizar Playwright cambia juntos `templates/tools/playwright-cli/`, la
 skill vendorizada, su `UPSTREAM.md` y `skills-lock.json`; ejecuta `npm ci` en un
 staging y prueba una sesión real con Chromium. Para `frontend-design`, revisa el
 árbol y la licencia del nuevo commit antes de copiarlo.
+
+Para PptxGenJS actualiza `templates/tools/presentations/`, su entrada de runtime en
+`skills-lock.json`, las comprobaciones de versión y el ejemplo si cambia la API.
+Instala desde el lock en staging y ejecuta `check-visuals.py`. Los cambios en skills
+locales también requieren recalcular sus hashes de contenido.
 
 Para futuros plugins publicados compatibles con V2, usa `opencode plugin add`,
 `opencode plugin check` y `opencode plugin update`. Este último omite plugins

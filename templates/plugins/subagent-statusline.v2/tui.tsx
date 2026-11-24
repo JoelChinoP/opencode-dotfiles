@@ -32,7 +32,6 @@ function Row(props) {
       <text fg={context.theme.text.muted} wrapMode="word" maxHeight={2}>
         {`${props.session.agent ?? "subagent"} / ${props.session.model?.id ?? "unknown model"}`}
       </text>
-      <text fg={context.theme.text.base} onMouseUp={open}>[Open]</text>
     </box>
   );
 }

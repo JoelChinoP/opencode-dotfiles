@@ -43,9 +43,12 @@ This avoids adding a TeX or Python PDF stack.
 After creation:
 
 1. Run `qpdf --check output.pdf` and `pdfinfo output.pdf`.
-2. Render representative pages with `pdftoppm`.
+2. Render all pages of a new document with `scripts/render.sh` into a new review
+   directory. For a localized edit, render affected pages and their neighbors.
 3. Inspect the images for clipping, missing glyphs, broken tables, blank pages,
    and unintended page breaks.
+4. Correct the editable source, regenerate and inspect again. Keep the source
+   and reference template with the requested PDF so later edits are reproducible.
 
 Poppler is required for `pdfinfo`, `pdftotext`, and `pdftoppm`; qpdf and
 Tesseract are optional capabilities.

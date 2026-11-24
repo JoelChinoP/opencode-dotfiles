@@ -1,5 +1,19 @@
 # Verificación del perfil Arch
 
+## Editores de la TUI — 21-11-2026
+
+OpenCode **2.3.2**, TUI real en pseudoterminal, `--standalone` y HOME/XDG
+temporales. Los ejecutables de prueba `zed` y `code` registraron los argumentos:
+`/open-zed` recibió la carpeta activa y `/open-vscode "Mi web" --profile "tRaBaJo WEB"`
+recibió la subcarpeta y el nombre guardado `Trabajo Web`. Al retomar una sesión
+desde otro directorio, `/open-zed docs` abrió la ruta de la sesión. Una carpeta
+inexistente y la ausencia de `zed` en el PATH produjeron avisos en la TUI.
+Con el selector `@` se eligió una subcarpeta anidada en Zed y una carpeta con
+dos espacios en el nombre en VS Code; la selección conservó los espacios y
+permitió añadir `--profile` antes de ejecutar el comando.
+No se abrieron ventanas gráficas. `node arch/check.mjs` y la prueba de
+instalación/reinstalación aislada para Bash y Zsh también pasaron.
+
 ## Engram y Ponytail — 03-11-2026
 
 OpenCode CLI/servicio **2.2.0**, Engram **3.6.1** y Ponytail oficial **5.3.3**.
@@ -278,3 +292,53 @@ documentos hostiles ni formularios/revisiones avanzadas y no se probó Windows.
 `uv` no está instalado ni es necesario: ninguna skill actual importa paquetes
 PyPI. La política PEP 723 + lock por script queda como gate para una necesidad
 futura, no como infraestructura anticipada.
+
+## Mejora visual — 04-11-2026
+
+Implementados y desplegados `presentation-slides` y `diagram-design`, y ampliado
+`document-files` con una referencia editorial generada, checker de paquetes y
+renderizado compartido. El catálogo administrado pasa a seis skills con hashes
+verificados y permisos explícitos.
+
+Comprobaciones realizadas:
+
+- `node arch/check.mjs`: configuración, permisos, hashes y correspondencia del
+  lock PptxGenJS 4.0.1 con su integridad declarada.
+- `TMPDIR=/tmp/opencode python -I arch/check-install.py`: instalación/reinstalación
+  para Bash/Zsh con espacios en las rutas, wrapper `slides-node`, prevalidación,
+  respaldo y restauración, manteniendo las pruebas anteriores.
+- `bash arch/check-documents.sh`: flujo documental básico previo conservado.
+- `arch/check-visuals.py --output DIR-NUEVO` con el runtime npm real: DOCX editorial
+  convertido a PDF, PPTX de tres slides con gráfico/hoja de datos/notas editables,
+  diagrama DOT exportado a SVG/PNG/PDF y sus imágenes.
+- Se inspeccionaron visualmente la página documental, las tres diapositivas y
+  el diagrama. Sin texto cortado, glifos ausentes ni colisiones visibles en los
+  ejemplos. Numeración de página visible y jerarquía tipográfica consistente.
+- Casos negativos: referencia existente conservada, directorio de render previo
+  rechazado, relación interna rota, entidades XML y figura fuera del lienzo
+  detectadas. La prueba inicial descubrió un prefijo XML de relación que Pandoc
+  no preservaba; el generador ahora serializa ese namespace como predeterminado.
+- Sintaxis Bash/Python/JavaScript y `git diff --check`: correctos.
+- Instalación real con `--no-start`: npm instaló las 19 dependencias fijadas sin
+  lifecycle scripts. Se respaldó el perfil global, se desplegaron las skills y
+  se comprobó PptxGenJS 4.0.1 mediante el wrapper instalado.
+- `arch/verify.sh --live`, por ruta absoluta desde un directorio sin configuración
+  de proyecto: OpenCode 2.2.5, las seis skills registradas, Engram/Ponytail activos,
+  Context7/Engram conectados y CodeGraph desactivado. No se reinició el servicio.
+
+Límites: revisión mediante LibreOffice, sin abrir Microsoft Office. El checker
+es básico, no XSD completo ni detector general de solapamientos/texto desbordado.
+No se ejecutó el benchmark de modelos: el catálogo de OpenCode no ofrecía Claude.
+El encargo común y la rúbrica quedan en [calidad-visual.md](calidad-visual.md).
+
+## Modern Web Guidance — 23-11-2026
+
+`node arch/check.mjs` y `python -I arch/check-install.py` pasaron con el séptimo
+ID administrado. El CLI real 1.0.2, ejecutado sin red (`unshare --user
+--map-root-user --net`), encontró `light-dismiss-a-dialog`, devolvió la guía con
+`closedby` y completó `legacy-scan` sobre un HTML de prueba.
+
+`/api/skill` confirmó la ruta global de la skill en la sesión. La comprobación
+integral `--live` se detuvo en una preferencia previa de la TUI (`autoaccept`
+frente al `prompt` de la plantilla); las comprobaciones estáticas pasaron con
+`prompt` en staging. El despliegue de la skill conservó la preferencia instalada.

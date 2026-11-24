@@ -1,11 +1,55 @@
 // node arch/check.mjs — comprobaciones sin red, paquetes npm ni llamadas a modelos.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
 import engram from "../templates/plugins/engram/index.js";
+import { editorArgs } from "../templates/plugins/open-editor/editor.js";
 import { children, elapsed, state } from "../templates/plugins/subagent-statusline.v2/state.js";
+
+// --- Editores: carpetas locales y nombres de perfil que la CLI reconoce exactamente ---
+const editorTest = mkdtempSync(join(tmpdir(), "opencode-editors-"));
+const previousPortable = process.env.VSCODE_PORTABLE;
+try {
+  process.env.VSCODE_PORTABLE = editorTest;
+  const root = join(editorTest, "proyecto");
+  const folder = join(root, "Mi web");
+  mkdirSync(folder, { recursive: true });
+  const store = join(editorTest, "user-data/User/globalStorage");
+  mkdirSync(store, { recursive: true });
+  const stateFile = join(store, "storage.json");
+  writeFileSync(stateFile, JSON.stringify({ userDataProfiles: ["Trabajo Web", "Go", "GO", "@Dev"].map((name) => ({ name })) }));
+  assert.deepEqual(await editorArgs("zed", root), ["-n", root]);
+  assert.deepEqual(await editorArgs("code", root, '"Mi web" --profile "trabajo WEB"'), ["-n", folder, "--profile", "Trabajo Web"]);
+  const nested = join(folder, "Mis  plugins");
+  mkdirSync(nested);
+  assert.deepEqual(await editorArgs("zed", root, "@Mi web/Mis  plugins"), ["-n", nested]);
+  assert.deepEqual(await editorArgs("code", root, '@Mi web --profile "trabajo web"'), ["-n", folder, "--profile", "Trabajo Web"]);
+  assert.deepEqual(await editorArgs("code", root, '--profile @dev @"Mi web"'), ["-n", folder, "--profile", "@Dev"]);
+  mkdirSync(join(root, "@equipo"));
+  assert.deepEqual(await editorArgs("zed", root, "./@equipo"), ["-n", join(root, "@equipo")]);
+  assert.deepEqual(await editorArgs("code", root, "--profile Go"), ["-n", root, "--profile", "Go"]);
+  await assert.rejects(editorArgs("code", root, "--profile go"), /mayúsculas exactas/);
+  await assert.rejects(editorArgs("code", root, "--profile nuevo"), /No se encontró el perfil/);
+  symlinkSync(store, join(root, "enlace"));
+  await assert.rejects(editorArgs("zed", root, "@enlace"), /fuera de la sesión/);
+  await assert.rejects(editorArgs("zed", root, "falta"), /No se puede acceder/);
+  writeFileSync(join(root, "archivo.txt"), "");
+  await assert.rejects(editorArgs("code", root, "archivo.txt"), /no es una carpeta/);
+  for (const input of ["@", "--profile", "--install-extension x", '"sin cerrar']) {
+    await assert.rejects(editorArgs("code", root, input), /Uso: \/open-vscode/);
+  }
+  await assert.rejects(editorArgs("zed", root, "--profile Go"), /Uso: \/open-zed/);
+  writeFileSync(stateFile, "{");
+  await assert.rejects(editorArgs("code", root, "--profile Go"), /catálogo de perfiles/);
+  assert.deepEqual(await editorArgs("code", root, "'Mi web'"), ["-n", folder]);
+} finally {
+  if (previousPortable === undefined) delete process.env.VSCODE_PORTABLE;
+  else process.env.VSCODE_PORTABLE = previousPortable;
+  rmSync(editorTest, { recursive: true, force: true });
+}
 
 // --- Subagentes: estados reales V2, prioridad y duración ---
 const child = (id, outcome, updated = 1000) => ({
@@ -94,6 +138,8 @@ for (const [action, resource, expected] of [
   ["skill", "unknown-skill", "deny"], ["skill", "context7-mcp", "deny"],
   ["skill", "opencode", "allow"], ["skill", "report", "allow"],
   ["skill", "document-files", "allow"], ["skill", "frontend-design", "allow"],
+  ["skill", "modern-web-guidance", "allow"], ["skill", "chrome-extensions", "deny"],
+  ["skill", "presentation-slides", "allow"], ["skill", "diagram-design", "allow"],
   ["skill", "playwright-cli", "allow"], ["skill", "skill-governance", "allow"],
   ...["ponytail", "ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help"].map((id) => ["skill", id, "allow"]),
   ["read", "node_modules/pkg/index.js", "ask"], ["read", "packages/ui/node_modules/pkg/index.js", "ask"],
@@ -114,12 +160,11 @@ assert.deepEqual(config.skills, ["~/.config/opencode/skills"]);
 
 const skillsLock = JSON.parse(readFileSync(new URL("../templates/skills-lock.json", import.meta.url)));
 assert.equal(skillsLock.version, 1);
-assert.deepEqual(skillsLock.skills.map((entry) => entry.id).sort(), [
-  "document-files", "frontend-design", "playwright-cli", "skill-governance",
+const managedSkills = skillsLock.skills.map((entry) => entry.id).sort();
+assert.deepEqual(managedSkills, [
+  "diagram-design", "document-files", "frontend-design", "modern-web-guidance", "playwright-cli", "presentation-slides", "skill-governance",
 ]);
-assert.deepEqual(readdirSync(new URL("../templates/skills", import.meta.url)).sort(), [
-  "document-files", "frontend-design", "playwright-cli", "skill-governance",
-]);
+assert.deepEqual(readdirSync(new URL("../templates/skills", import.meta.url)).sort(), managedSkills);
 for (const { id } of skillsLock.skills) {
   const text = readFileSync(new URL(`../templates/skills/${id}/SKILL.md`, import.meta.url), "utf8");
   assert.match(text, /^---\n[\s\S]*\ndescription:/, id);
@@ -153,6 +198,15 @@ const playwrightLock = JSON.parse(readFileSync(new URL("../templates/tools/playw
 const playwrightPackage = playwrightLock.packages["node_modules/@playwright/cli"];
 assert.equal(playwrightPackage.version, "0.1.21");
 assert.equal(playwrightPackage.integrity, skillsLock.skills.find((entry) => entry.id === "playwright-cli").runtime.integrity);
+const slidesLock = JSON.parse(readFileSync(new URL("../templates/tools/presentations/package-lock.json", import.meta.url)));
+const slidesRuntime = skillsLock.skills.find((entry) => entry.id === "presentation-slides").runtime;
+assert.equal(slidesLock.packages["node_modules/pptxgenjs"].version, slidesRuntime.version);
+assert.equal(slidesLock.packages["node_modules/pptxgenjs"].integrity, slidesRuntime.integrity);
+const webRuntime = skillsLock.skills.find((entry) => entry.id === "modern-web-guidance").runtime;
+const webLock = JSON.parse(readFileSync(new URL("../templates/tools/modern-web-guidance/package-lock.json", import.meta.url)));
+assert.equal(webLock.packages[""].dependencies[webRuntime.package], webRuntime.version);
+assert.equal(webLock.packages[`node_modules/${webRuntime.package}`].version, webRuntime.version);
+assert.equal(webLock.packages[`node_modules/${webRuntime.package}`].integrity, webRuntime.integrity);
 
 const models = config.providers.openai.models;
 assert.equal(config.agents.title.model, "opencode/big-pickle");
@@ -178,4 +232,4 @@ for (const [id, options] of Object.entries(models)) {
   assert.equal(threshold, thresholds[id.replace(/-fast$/, "")], `${id}: umbral de compactación`);
 }
 
-console.log("OK: subagentes (estados, orden y duración); Ponytail; Engram; skills y runtime fijados; permisos, modelos y títulos.");
+console.log("OK: editores (carpetas y perfiles); subagentes (estados, orden y duración); Ponytail; Engram; skills y runtime fijados; permisos, modelos y títulos.");

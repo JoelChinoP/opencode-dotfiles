@@ -1,0 +1,8 @@
+{
+  "name": "opencode-dotfiles-modern-web-guidance",
+  "private": true,
+  "version": "1.0.2",
+  "dependencies": {
+    "modern-web-guidance": "1.0.2"
+  }
+}

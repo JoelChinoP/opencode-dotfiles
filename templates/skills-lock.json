@@ -4,11 +4,38 @@
     {
       "id": "document-files",
       "source": { "type": "local" },
-      "content_sha256": "9bdecb125dfebd37853f7daa95952db36db0212b404eb0334cefefb5deb0b96c",
+      "content_sha256": "3e3b455dacb6cb0990868783f4ea6d4b1a718424280ea0da0c26c47579ba692d",
       "runtime": {
         "type": "system",
-        "required_commands": ["pandoc", "libreoffice", "pdfinfo", "pdftotext", "pdftoppm"],
+        "required_commands": ["python", "pandoc", "libreoffice", "pdfinfo", "pdftotext", "pdftoppm", "fc-match", "timeout"],
+        "required_fonts": ["Noto Sans", "Noto Serif"],
         "optional_commands": ["qpdf", "tesseract"]
+      },
+      "autoinvoke": true
+    },
+    {
+      "id": "presentation-slides",
+      "source": { "type": "local" },
+      "content_sha256": "0ca07c1d96e5ee4445f43155eeb68bacfbd6737a4b87212852dcf39347d4baa4",
+      "runtime": {
+        "type": "node-tool",
+        "package": "pptxgenjs",
+        "version": "4.0.1",
+        "license": "MIT",
+        "integrity": "sha512-TeJISr8wouAuXw4C1F/mC33xbZs/FuEG6nH9FG1Zj+nuPcGMP5YRHl6X+j3HSUnS1f3at6k75ZZXPMZlA5Lj9A==",
+        "required_commands": ["slides-node", "libreoffice", "pdftoppm", "fc-match"],
+        "required_fonts": ["Noto Sans"]
+      },
+      "autoinvoke": true
+    },
+    {
+      "id": "diagram-design",
+      "source": { "type": "local" },
+      "content_sha256": "aad53436b0982035cea44197112481a7320335dd30942a1b4dc68a7f87e0a9bf",
+      "runtime": {
+        "type": "system",
+        "required_commands": ["dot", "fc-match"],
+        "required_fonts": ["Noto Sans"]
       },
       "autoinvoke": true
     },
@@ -23,6 +50,27 @@
       "license": "Apache-2.0",
       "content_sha256": "4d60d6583c57672238c752dce692ca53e9213f433c76943c3146798006f631ac",
       "runtime": { "type": "none" },
+      "autoinvoke": true
+    },
+    {
+      "id": "modern-web-guidance",
+      "source": {
+        "type": "github",
+        "repository": "GoogleChrome/modern-web-guidance",
+        "commit": "2b4aa13a72dd47cd135b06ce5abfccd92e19b24f",
+        "path": "skills/modern-web-guidance",
+        "locally_modified": true
+      },
+      "files": ["SKILL.md", "UPSTREAM.md", "LICENSE"],
+      "license": "Apache-2.0 AND CC-BY-4.0",
+      "content_sha256": "906392b009cdd1e5cc5db294821fd7db51440c7bedad4c0e46f93f0559ead640",
+      "runtime": {
+        "type": "node-tool",
+        "package": "modern-web-guidance",
+        "version": "1.0.2",
+        "integrity": "sha512-ksFBCdzMl5xxf7wuF7XQbudQ6El1e2VrO0WzcH/U29NYGNzu0EZjtojkfwzFBSnmenDyl7QIwPCgYvfEmZHr+w==",
+        "required_commands": ["node", "npm"]
+      },
       "autoinvoke": true
     },
     {

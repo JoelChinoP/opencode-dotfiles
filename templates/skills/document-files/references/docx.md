@@ -14,16 +14,23 @@ when it matters.
 
 ## Create
 
-Keep Markdown as the source and generate a new DOCX:
+Keep Markdown as the source. Use the approved reference if supplied, otherwise
+generate the editorial reference from this skill (`$DOCUMENT_SKILL` is the base
+directory returned by the skill tool):
 
 ```sh
-pandoc source.md --output=output.docx
+python -I "$DOCUMENT_SKILL/scripts/reference_doc.py" reference.docx
+pandoc source.md --reference-doc=reference.docx --output=output.docx
 ```
 
-When the user supplies an approved style template:
+Use document metadata rather than manually styled title paragraphs:
 
-```sh
-pandoc source.md --reference-doc=reference.docx --output=output.docx
+```yaml
+---
+title: Informe de operaciones
+subtitle: Resultados y decisiones
+lang: es-ES
+---
 ```
 
 Use semantic Markdown headings, lists, tables, captions, and alt text. Do not
@@ -32,29 +39,26 @@ untrusted reference document or macro-enabled Office file.
 
 ## Validate and render
 
-Test the ZIP container using Python's standard library:
+Check the package without extracting it:
 
 ```sh
-python -I -m zipfile -t output.docx
+python -I "$DOCUMENT_SKILL/scripts/check_office.py" output.docx
 ```
 
-Render through a task-local LibreOffice profile so a running desktop instance
-does not share state with the conversion:
+Render through the shared helper. It isolates LibreOffice, rejects an existing
+review directory and produces PDF, text and an image of every page:
 
 ```sh
-mkdir -p /tmp/opencode-doc-profile /tmp/opencode-doc-render
-libreoffice -env:UserInstallation=file:///tmp/opencode-doc-profile \
-  --headless --convert-to pdf --outdir /tmp/opencode-doc-render output.docx
+bash "$DOCUMENT_SKILL/scripts/render.sh" output.docx "$PWD/review-01"
 ```
 
-Use unique task-local directories rather than the literal example when jobs
-may overlap. Render representative PDF pages with `pdftoppm` and inspect them
-for clipping, missing fonts, malformed tables, blank pages, header/footer
-problems, and bad page breaks.
+Read the printed image paths. Inspect every page of a new document for clipping,
+missing fonts, malformed tables, blank pages, header/footer problems and bad page
+breaks. After a correction, rebuild and render into a new review directory.
 
 ## Convert existing DOCX to PDF
 
-Use the same isolated LibreOffice command and preserve the DOCX. Validate the
+Use the same isolated rendering helper and preserve the DOCX. Validate the
 result using the PDF workflow. Conversion can reflow fonts not installed on
 the machine; disclose that limitation instead of claiming pixel equivalence.
 

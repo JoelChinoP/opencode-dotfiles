@@ -1,0 +1,8 @@
+{
+  "name": "opencode-dotfiles-presentations",
+  "private": true,
+  "version": "4.0.1",
+  "dependencies": {
+    "pptxgenjs": "4.0.1"
+  }
+}

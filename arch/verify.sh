@@ -33,7 +33,8 @@ for action, resource, effect in (
     ("engram_mem_save_prompt", "*", "deny"), ("engram_mem_capture_passive", "*", "deny"),
 ):
     assert {"action": action, "resource": resource, "effect": effect} in rules
-for skill_id in ("opencode", "report", "document-files", "frontend-design", "playwright-cli", "skill-governance", "ponytail", "ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help"):
+expected_skills = {"document-files", "presentation-slides", "diagram-design", "frontend-design", "modern-web-guidance", "playwright-cli", "skill-governance"}
+for skill_id in (*expected_skills, "opencode", "report", "ponytail", "ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help"):
     assert {"action": "skill", "resource": skill_id, "effect": "allow"} in rules
 assert {"action": "skill", "resource": "*", "effect": "deny"} in rules
 assert "./plugins/engram" in config["plugins"]
@@ -48,13 +49,13 @@ assert cli["session"]["permissions"] == "prompt"
 turn_tokens = cli.get("debug", {}).get("turn_tokens", False)
 assert isinstance(turn_tokens, bool) or turn_tokens == "verbose", "debug.turn_tokens debe ser boolean o verbose"
 assert json.loads((root / "service.json").read_text())["hostname"] == "127.0.0.1"
-assert "./plugins/subagent-statusline.v2" in cli["plugins"]
-statusline = root / "plugins/subagent-statusline.v2"
-status_tui = json.loads((statusline / "package.json").read_text())["exports"]["./tui"]
-assert (statusline / status_tui).is_file()
+for entry in ("./plugins/subagent-statusline.v2", "./plugins/open-editor"):
+    assert entry in cli["plugins"], entry
+    plugin = root / entry
+    tui = json.loads((plugin / "package.json").read_text())["exports"]["./tui"]
+    assert (plugin / tui).is_file(), entry
 
 skills = root / "skills"
-expected_skills = {"document-files", "frontend-design", "playwright-cli", "skill-governance"}
 assert {path.name for path in skills.iterdir() if path.is_dir()} == expected_skills
 assert not any(path.is_symlink() for path in skills.rglob("*")), "Las skills administradas no admiten symlinks"
 lock = json.loads((root / "skills-lock.json").read_text())
@@ -77,8 +78,14 @@ assert entries["skill-governance"]["autoinvoke"] is False
 assert (skills / "document-files/references/pdf.md").is_file()
 assert (skills / "document-files/references/docx.md").is_file()
 assert entries["document-files"]["runtime"]["type"] == "system"
-for command in entries["document-files"]["runtime"]["required_commands"]:
-    assert shutil.which(command), f"Falta dependencia documental: {command}"
+for skill_id in ("document-files", "presentation-slides", "diagram-design"):
+    for command in entries[skill_id]["runtime"]["required_commands"]:
+        if command != "slides-node":  # Se verifica por ruta absoluta, incluso antes de abrir una shell nueva.
+            assert shutil.which(command), f"Falta dependencia de {skill_id}: {command}"
+for font in entries["document-files"]["runtime"]["required_fonts"]:
+    assert subprocess.check_output(["fc-match", "-f", "%{family}", font], text=True) == font, f"Falta fuente: {font}"
+assert (skills / "document-files/scripts/check_office.py").is_file()
+assert (skills / "document-files/scripts/render.sh").is_file()
 
 frontend = entries["frontend-design"]
 assert frontend["source"]["commit"] == "34040c9c568585f6929bedeaad110ad08f079624"
@@ -97,15 +104,29 @@ playwright_text = (skills / "playwright-cli/SKILL.md").read_text()
 assert "npm install -g" not in playwright_text and "allowed-tools:" not in playwright_text
 assert playwright["source"]["commit"] in (skills / "playwright-cli/UPSTREAM.md").read_text()
 data_home = pathlib.Path(os.environ.get("XDG_DATA_HOME", pathlib.Path.home() / ".local/share"))
+web = entries["modern-web-guidance"]
+assert web["source"]["commit"] in (skills / "modern-web-guidance/UPSTREAM.md").read_text()
+for filename in web["files"]:
+    assert (skills / "modern-web-guidance" / filename).is_file(), filename
+web_cli = data_home / "opencode-dotfiles-v2/bin/modern-web-guidance"
+def web_run(*args):
+    return subprocess.check_output([web_cli, *args], text=True, timeout=30)
+assert web_run("--version").strip() == web["runtime"]["version"]
+assert "light-dismiss-a-dialog" in {result["id"] for result in json.loads(web_run("search", "light dismiss dialog"))}
+assert "closedby" in web_run("retrieve", "light-dismiss-a-dialog")
 playwright_wrapper = data_home / "opencode-dotfiles-v2/bin/playwright-cli"
 assert playwright_wrapper.is_file() and os.access(playwright_wrapper, os.X_OK)
 playwright_version = subprocess.check_output([playwright_wrapper, "--version"], text=True, timeout=30).strip()
 assert "0.1.21" in playwright_version, playwright_version
+slides_wrapper = data_home / "opencode-dotfiles-v2/bin/slides-node"
+assert slides_wrapper.is_file() and os.access(slides_wrapper, os.X_OK)
+slides_version = subprocess.check_output([slides_wrapper, "-p", 'new (require("pptxgenjs"))().version'], text=True, timeout=30).strip()
+assert slides_version == entries["presentation-slides"]["runtime"]["version"], slides_version
 
 binary = servers["engram"]["command"][0]
 version = subprocess.check_output([binary, "version"], text=True, timeout=15).strip()
 assert version == "engram 3.6.1", version
-print("OK: configuración V2, cuatro skills fijadas, Playwright CLI, Ponytail 5.3.3 y Engram 3.6.1.")
+print(f"OK: configuración V2, {len(expected_skills)} skills fijadas, consulta web local, runtime PPTX, fuentes, Graphviz, Playwright CLI, Ponytail 5.3.3 y Engram 3.6.1.")
 PY
 if $live; then
   opencode service status
@@ -116,6 +137,7 @@ def api(path):
     return result.get("data", result) if isinstance(result, dict) else result
 info = api("/api/info")
 print("OpenCode", info["version"])
+managed_skills = {"document-files", "presentation-slides", "diagram-design", "frontend-design", "modern-web-guidance", "playwright-cli", "skill-governance"}
 for attempt in range(30):
     plugins = {p.get("id", str(p["source"])): p["state"]["status"] for p in api("/api/plugin")}
     failed = [name for name, status in plugins.items() if status == "failed"]
@@ -125,7 +147,8 @@ for attempt in range(30):
     skills = {s["id"]: s for s in api("/api/skill")}
     ready = plugins.get("engram") == "active" and plugins.get("ponytail") == "active"
     ready = ready and servers == {"context7": "connected", "engram": "connected", "codegraph": "disabled"}
-    ready = ready and {"document-files", "frontend-design", "playwright-cli", "skill-governance"} <= set(skills)
+    ready = ready and managed_skills <= set(skills)
+    ready = ready and skills.get("modern-web-guidance", {}).get("autoinvoke", True) is True
     ready = ready and {"ponytail", "ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help"} <= set(skills)
     ready = ready and skills.get("skill-governance", {}).get("autoinvoke") is False
     if ready:
@@ -133,7 +156,7 @@ for attempt in range(30):
     time.sleep(0.5)
 print("Plugins servidor:", {name: plugins.get(name) for name in ("engram", "ponytail")})
 print("MCP:", servers)
-print("Skills administradas:", sorted(set(skills) & {"document-files", "frontend-design", "playwright-cli", "skill-governance"}))
+print("Skills administradas:", sorted(set(skills) & managed_skills))
 if not ready:
     raise SystemExit("Integración pendiente. Revisa opencode mcp list; autentica Context7 en /mcps si lo solicita.")
 print("OK: plugins Engram y Ponytail activos y conexiones MCP. Abre la TUI para ver la statusline.")

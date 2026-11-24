@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """python arch/check-install.py — instalador aislado, sin red ni servicio real."""
 import os
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -99,6 +100,36 @@ exec "{real_mv}" "$@"
             package_dir = install_dir / f"tools/playwright-cli-0.1.21/node_modules/{package}"
             package_dir.mkdir()
             (package_dir / "package.json").write_text(json.dumps({"name": package, "version": version}))
+        slides_hash = hashlib.sha256((root / "templates/tools/presentations/package-lock.json").read_bytes()).hexdigest()
+        slides_package = install_dir / f"tools/presentations-{slides_hash}/node_modules/pptxgenjs"
+        slides_package.mkdir(parents=True)
+        (slides_package / "package.json").write_text(json.dumps({"name": "pptxgenjs", "version": "4.0.1"}))
+        (slides_package / "index.js").write_text('module.exports = class { get version() { return "4.0.1"; } };\n')
+
+        # Solo esta dependencia se instala desde cero. El doble de npm no usa red.
+        npm = binaries / "npm"
+        npm.write_text('''#!/usr/bin/env python3
+from pathlib import Path
+import json, sys
+assert sys.argv[1:3] == ["ci", "--prefix"] and "--ignore-scripts" in sys.argv
+stage = Path(sys.argv[3])
+assert json.loads((stage / "package.json").read_text())["dependencies"] == {"modern-web-guidance": "1.0.2"}
+cli = stage / "node_modules/.bin/modern-web-guidance"
+cli.parent.mkdir(parents=True)
+cli.write_text("""#!/bin/sh
+[ "$DISABLE_TELEMETRY:$ENABLE_FILE_LOGGING" = 1:false ] || exit 1
+case "$*" in
+  --version) echo 1.0.2;;
+  'search light dismiss dialog') echo '[{"id":"light-dismiss-a-dialog"}]';;
+  'retrieve light-dismiss-a-dialog') echo 'Use closedby';;
+  *) exit 1;;
+esac
+""")
+cli.chmod(0o755)
+with (Path.home() / "npm-calls").open("a") as stream:
+    stream.write("ci\\n")
+''')
+        npm.chmod(0o755)
 
         rc = Path(env["ZDOTDIR"]) / ".zshrc" if shell == "zsh" else home / ".bashrc"
         target = home / "dotfiles rc"
@@ -151,21 +182,27 @@ exec "{real_mv}" "$@"
             cli = json.loads((config_dir / "cli.json").read_text())
             assert cli["session"]["permissions"] == "prompt"
             assert cli["debug"]["turn_tokens"] is True
-            assert cli["plugins"] == ["./plugins/subagent-statusline.v2"] + (["./herdr-opencode"] if shell == "zsh" else [])
+            assert cli["plugins"] == ["./plugins/subagent-statusline.v2", "./plugins/open-editor"] + (["./herdr-opencode"] if shell == "zsh" else [])
             if shell == "zsh":
                 assert (config_dir / "herdr-opencode/tui.js").is_file()
                 assert len((home / "herdr-calls").read_text().splitlines()) == installation + 1
-            assert {path.name for path in (config_dir / "skills").iterdir() if path.is_dir()} == {
-                "document-files", "frontend-design", "playwright-cli", "skill-governance"
+            expected_skills = {
+                "document-files", "presentation-slides", "diagram-design", "frontend-design", "modern-web-guidance", "playwright-cli", "skill-governance"
             }
-            assert {entry["id"] for entry in json.loads((config_dir / "skills-lock.json").read_text())["skills"]} == {
-                "document-files", "frontend-design", "playwright-cli", "skill-governance"
-            }
+            assert {path.name for path in (config_dir / "skills").iterdir() if path.is_dir()} == expected_skills
+            assert {entry["id"] for entry in json.loads((config_dir / "skills-lock.json").read_text())["skills"]} == expected_skills
+            assert (home / "npm-calls").read_text().splitlines() == ["ci"], "Reinstalar debe reutilizar el runtime web fijado"
+            assert subprocess.run([install_dir / "bin/modern-web-guidance", "update"], env=env, capture_output=True).returncode == 2
             result = subprocess.run(
                 [install_dir / "bin/playwright-cli", "--version"], env=env,
                 check=True, capture_output=True, text=True,
             )
             assert result.stdout.strip() == "Version 0.1.21"
+            result = subprocess.run(
+                [install_dir / "bin/slides-node", "-p", 'new (require("pptxgenjs"))().version'],
+                env=env, check=True, capture_output=True, text=True,
+            )
+            assert result.stdout.strip() == "4.0.1"
             content = target.read_text()
             assert content.count("alias oc='command opencode'") == 1
             assert content.count("alias oc-last='command opencode --continue'") == 1

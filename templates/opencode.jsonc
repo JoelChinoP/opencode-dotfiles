@@ -1,5 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "experimental": {
+    "image_generate": { "model": "openai/gpt-image-2" }
+  },
   "default_agent": "build",
   "update": "notify",
   "agents": {
@@ -73,7 +76,10 @@
     { "action": "skill", "resource": "opencode", "effect": "allow" },
     { "action": "skill", "resource": "report", "effect": "allow" },
     { "action": "skill", "resource": "document-files", "effect": "allow" },
+    { "action": "skill", "resource": "presentation-slides", "effect": "allow" },
+    { "action": "skill", "resource": "diagram-design", "effect": "allow" },
     { "action": "skill", "resource": "frontend-design", "effect": "allow" },
+    { "action": "skill", "resource": "modern-web-guidance", "effect": "allow" },
     { "action": "skill", "resource": "playwright-cli", "effect": "allow" },
     { "action": "skill", "resource": "skill-governance", "effect": "allow" },
     { "action": "skill", "resource": "ponytail", "effect": "allow" },

@@ -11,9 +11,9 @@
 ## Perfil y despliegue
 
 - `templates/opencode.jsonc` registra los plugins de servidor Engram y Ponytail;
-  la statusline de TUI se registra aparte en `templates/cli.json`. Herdr es
-  opcional: el instalador vuelve a ejecutar su integración oficial después de
-  desplegar el perfil cuando encuentra Herdr estable >= 0.9.1 en el PATH.
+  la statusline y el lanzador de editores de la TUI se registran en
+  `templates/cli.json`. Tras desplegar el perfil, el instalador vuelve a ejecutar
+  la integración oficial de Herdr si encuentra Herdr estable >= 0.9.1 en el PATH.
 - Ponytail usa el paquete oficial `@dietrichgebert/ponytail@5.3.3`, con API V2.
   El instalador fija `lite` en `ponytail/config.json` y `opencode/.ponytail-active`;
   el nivel elegido se comparte entre sesiones. No reinstales el adaptador antiguo.
@@ -33,6 +33,9 @@
   plantillas, sin red ni servicio. `python arch/check-install.py`: instalador en
   HOME/XDG aislados con dobles de binarios; requiere Bash, Zsh y herramientas de
   Arch. `bash arch/check-documents.sh`: smoke DOCX/PDF con Pandoc, LibreOffice y Poppler.
+- `python -I arch/check-visuals.py --output DIR-NUEVO`: DOCX editorial, PPTX con
+  PptxGenJS, diagramas Graphviz y regresiones del validador. Requiere `slides-node`
+  del perfil; conserva renders para inspección visual. No llama modelos.
 - `bash arch/verify.sh` valida el perfil *instalado*, no `templates/`; usa
   `--config-dir DIR` para un staging preparado o `--live` después de activar el
   servicio. Para `--live`, invoca el script por ruta absoluta desde un directorio

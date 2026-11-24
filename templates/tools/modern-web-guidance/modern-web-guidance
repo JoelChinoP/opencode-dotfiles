@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+case "${1:-}" in
+  search|list|retrieve|legacy-scan|--version) ;;
+  *) echo 'Uso: modern-web-guidance {search|list|retrieve|legacy-scan|--version} [argumentos]' >&2; exit 2 ;;
+esac
+base="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+export DISABLE_TELEMETRY=1 ENABLE_FILE_LOGGING=false
+exec "$base/tools/modern-web-guidance-1.0.2/node_modules/.bin/modern-web-guidance" "$@"
