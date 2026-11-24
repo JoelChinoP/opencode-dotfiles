@@ -1,9 +1,10 @@
-/** @jsxImportSource @opentui/solid */
+1/** @jsxImportSource @opentui/solid */
 import { Plugin } from "@opencode/plugin/tui";
 import { BoxRenderable, ImageRenderable, TextAttributes, type MarkdownCodeBlockRenderer } from "@opentui/core";
 import { useTerminalDimensions } from "@opentui/solid";
 import { createSignal } from "solid-js";
 import { lstatSync } from "node:fs";
+import { copyImage } from "./clipboard.js";
 
 export default Plugin.define({
   id: "image-preview",
@@ -37,8 +38,20 @@ export default Plugin.define({
             const muted = context.theme.text.muted;
             return <box paddingLeft={3} paddingRight={3} paddingBottom={1} gap={1}>
               <box flexDirection="row" justifyContent="space-between">
-                <text attributes={TextAttributes.BOLD}>Image {index() + 1} of {paths.length}</text>
-                <text fg={muted} onMouseUp={() => context.ui.dialog.clear()}>esc</text>
+                <box flexGrow={1} flexBasis={0}><text attributes={TextAttributes.BOLD}>Image {index() + 1} of {paths.length}</text></box>
+                  <text fg={muted} onMouseUp={async event => {
+                    if (event.button !== 0) return;
+                    event.stopPropagation();
+                    try {
+                      await copyImage(paths[index()]);
+                      context.ui.toast.show({ message: "Image copied", variant: "success" });
+                    } catch {
+                      context.ui.toast.show({ message: "Could not copy image. Check the PNG and wl-copy.", variant: "error" });
+                    }
+                  }}>Copy  </text>
+                <box flexGrow={1} flexBasis={0} alignItems="flex-end">
+                  <text fg={muted} onMouseUp={() => context.ui.dialog.clear()}>esc</text>
+                </box>
               </box>
               <image source={paths[index()]} width="100%" height={Math.max(3, dimensions().height - 8)} fit="fit" protocol="auto" />
               <box flexDirection="row" justifyContent="space-between">
