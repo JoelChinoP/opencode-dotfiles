@@ -1,0 +1,12 @@
+{
+  "name": "account-quota",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Account quota and route order for OpenCode.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./tui": "./tui.tsx",
+    "./rpc": "./rpc.js"
+  }
+}

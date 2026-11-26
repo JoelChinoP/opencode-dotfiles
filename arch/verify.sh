@@ -11,6 +11,7 @@ case "${1:-}" in
 esac
 for script in "$root"/arch/*.sh; do bash -n "$script"; done
 node --check "$config_dir/plugins/engram/index.js"
+for file in "$config_dir"/plugins/account-quota/*.js; do node --check "$file"; done
 python -I - "$config_dir" <<'PY'
 import hashlib, json, os, pathlib, shutil, subprocess, sys
 root = pathlib.Path(sys.argv[1])
@@ -54,6 +55,14 @@ for entry in ("./plugins/subagent-statusline.v2", "./plugins/open-editor", "./pl
     plugin = root / entry
     tui = json.loads((plugin / "package.json").read_text())["exports"]["./tui"]
     assert (plugin / tui).is_file(), entry
+# Account Quota: una sola entrada de servidor, que trae su TUI y su RPC; nunca en cli.json.
+quota = [entry for entry in config["plugins"] if (entry.get("package") if isinstance(entry, dict) else entry) == "./plugins/account-quota"]
+assert len(quota) == 1, "Account Quota debe registrarse una vez en opencode.jsonc"
+assert not any("account-quota" in json.dumps(entry) for entry in cli["plugins"]), "Account Quota no se registra en cli.json"
+plugin = root / "plugins/account-quota"
+exports = json.loads((plugin / "package.json").read_text())["exports"]
+for part in (".", "./tui", "./rpc"):
+    assert (plugin / exports[part]).is_file(), f"Account Quota: falta {part}"
 
 skills = root / "skills"
 assert {path.name for path in skills.iterdir() if path.is_dir()} == expected_skills
@@ -126,7 +135,7 @@ assert slides_version == entries["presentation-slides"]["runtime"]["version"], s
 binary = servers["engram"]["command"][0]
 version = subprocess.check_output([binary, "version"], text=True, timeout=15).strip()
 assert version == "engram 3.6.1", version
-print(f"OK: configuración V2, {len(expected_skills)} skills fijadas, consulta web local, runtime PPTX, fuentes, Graphviz, Playwright CLI, Ponytail 5.3.3 y Engram 3.6.1.")
+print(f"OK: configuración V2, {len(expected_skills)} skills fijadas, consulta web local, runtime PPTX, fuentes, Graphviz, Playwright CLI, Account Quota, Ponytail 5.3.3 y Engram 3.6.1.")
 PY
 if $live; then
   opencode service status
@@ -145,7 +154,7 @@ for attempt in range(30):
         raise SystemExit("Plugins fallidos: " + ", ".join(failed))
     servers = {s["name"]: s["status"]["status"] for s in api("/api/mcp")}
     skills = {s["id"]: s for s in api("/api/skill")}
-    ready = plugins.get("engram") == "active" and plugins.get("ponytail") == "active"
+    ready = all(plugins.get(name) == "active" for name in ("engram", "ponytail", "account-quota"))
     ready = ready and servers == {"context7": "connected", "engram": "connected", "codegraph": "disabled"}
     ready = ready and managed_skills <= set(skills)
     ready = ready and skills.get("modern-web-guidance", {}).get("autoinvoke", True) is True
@@ -154,11 +163,11 @@ for attempt in range(30):
     if ready:
         break
     time.sleep(0.5)
-print("Plugins servidor:", {name: plugins.get(name) for name in ("engram", "ponytail")})
+print("Plugins servidor:", {name: plugins.get(name) for name in ("engram", "ponytail", "account-quota")})
 print("MCP:", servers)
 print("Skills administradas:", sorted(set(skills) & managed_skills))
 if not ready:
     raise SystemExit("Integración pendiente. Revisa opencode mcp list; autentica Context7 en /mcps si lo solicita.")
-print("OK: plugins Engram y Ponytail activos y conexiones MCP. Abre la TUI para ver la statusline.")
+print("OK: plugins Engram, Ponytail y Account Quota activos y conexiones MCP. Abre la TUI para ver la statusline y /quota.")
 PY
 fi

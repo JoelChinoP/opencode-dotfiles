@@ -10,10 +10,15 @@
 
 ## Perfil y despliegue
 
-- `templates/opencode.jsonc` registra los plugins de servidor Engram y Ponytail;
-  la statusline, el lanzador de editores y `image-preview` de la TUI se registran en
+- `templates/opencode.jsonc` registra los plugins de servidor Engram, Ponytail y
+  Account Quota; la statusline, el lanzador de editores y `image-preview` de la TUI se registran en
   `templates/cli.json`. Tras desplegar el perfil, el instalador vuelve a ejecutar
   la integración oficial de Herdr si encuentra Herdr estable >= 0.9.1 en el PATH.
+- Account Quota (`/quota`) es una copia solo de ejecución de su propio proyecto:
+  no la edites aquí. Su única entrada trae también su TUI y su RPC, nunca va en
+  `cli.json` y activa `experimentalCodexUsage` y `experimentalClaudeUsage`. Para
+  actualizarla, vuelve a copiar los archivos de `runtime_files` de su
+  `scripts/host-lab.sh` y fija `version` y `content_sha256` en `arch/check.mjs`.
 - Ponytail usa el paquete oficial `@dietrichgebert/ponytail@5.3.3`, con API V2.
   El instalador fija `lite` en `ponytail/config.json` y `opencode/.ponytail-active`;
   el nivel elegido se comparte entre sesiones. No reinstales el adaptador antiguo.

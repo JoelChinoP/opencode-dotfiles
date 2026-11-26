@@ -24,7 +24,8 @@
         "gpt-6.1-sol": { "limit": { "context": 700000, "input": 570000, "output": 128000 } },
         "gpt-6.1-terra": { "limit": { "context": 600000, "input": 470000, "output": 128000 } },
         "gpt-6-luna": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
-        "gpt-6-luna-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } }
+        "gpt-6-luna-fast": { "limit": { "context": 500000, "input": 370000, "output": 128000 } },
+        "gpt-image-2": { "type": "image", "package": "@opencode/ai/providers/openai/images", "disabled": false }
       }
     }
   },
@@ -37,7 +38,14 @@
   ],
   "plugins": [
     "@dietrichgebert/ponytail@5.3.3",
-    "./plugins/engram"
+    "./plugins/engram",
+    {
+      "package": "./plugins/account-quota",
+      "options": {
+        "experimentalCodexUsage": true,
+        "experimentalClaudeUsage": true
+      }
+    }
   ],
   "mcp": {
     "servers": {

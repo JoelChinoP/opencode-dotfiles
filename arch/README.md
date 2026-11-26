@@ -218,6 +218,14 @@ el uso normal de la TUI por SSH.
 - La statusline de subagentes vive en `templates/plugins/subagent-statusline.v2/`
   y se registra en `cli.json` como plugin de TUI; no consume contexto del modelo y
   solo muestra información en la interfaz.
+- Account Quota vive en `templates/plugins/account-quota/` y se registra una sola
+  vez en `opencode.jsonc`; esa entrada trae su TUI (`/quota`, o `Account quota and
+  routing` en `Ctrl+P`) y su RPC. Es una copia solo de ejecución de su proyecto,
+  sin dependencias npm; `arch/check.mjs` fija su versión y su hash. Con
+  `experimentalCodexUsage` y `experimentalClaudeUsage` activadas, `r` y `a`
+  consultan el uso de Codex y de Claude Code solo cuando los pulsas, y Claude Code
+  también se lee de sus propios turnos. Esa lectura aún no se ha probado con
+  cuentas reales. Para retirarlo, borra la entrada y la carpeta.
 - `document-files`, `presentation-slides`, `diagram-design`, `frontend-design` y
   `playwright-cli` se anuncian cuando son
   pertinentes. `skill-governance` queda disponible para carga explícita, pero

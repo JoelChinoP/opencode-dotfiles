@@ -169,8 +169,8 @@ for (const { id } of skillsLock.skills) {
   const text = readFileSync(new URL(`../templates/skills/${id}/SKILL.md`, import.meta.url), "utf8");
   assert.match(text, /^---\n[\s\S]*\ndescription:/, id);
 }
-function skillHash(id) {
-  const root = fileURLToPath(new URL(`../templates/skills/${id}`, import.meta.url));
+const skillHash = (id) => treeHash(fileURLToPath(new URL(`../templates/skills/${id}`, import.meta.url)));
+function treeHash(root) {
   const files = [];
   function walk(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -190,6 +190,28 @@ function skillHash(id) {
   return hash.digest("hex");
 }
 for (const entry of skillsLock.skills) assert.equal(skillHash(entry.id), entry.content_sha256, entry.id);
+
+// --- Account Quota: copia solo de ejecución de su proyecto; una entrada de servidor que trae su TUI y su RPC ---
+// Se actualiza copiando de nuevo desde el proyecto (nunca editando aquí) y fijando su versión y hash.
+const accountQuota = { version: "1.0.0", content_sha256: "ffcf86c979d8f2a20c6b0941f698aaa84770ede04eb70c3358c280a5a113618e" };
+const quotaRoot = fileURLToPath(new URL("../templates/plugins/account-quota", import.meta.url));
+assert.deepEqual(config.plugins.filter((entry) => (entry.package ?? entry) === "./plugins/account-quota"), [{
+  package: "./plugins/account-quota", options: { experimentalCodexUsage: true, experimentalClaudeUsage: true },
+}]);
+assert.ok(!cli.plugins.some((entry) => String(entry.package ?? entry).includes("account-quota")), "Account Quota se registra solo en opencode.jsonc");
+const quotaManifest = JSON.parse(readFileSync(join(quotaRoot, "package.json")));
+assert.equal(quotaManifest.name, "account-quota");
+assert.equal(quotaManifest.version, accountQuota.version);
+assert.deepEqual(quotaManifest.exports, { ".": "./index.js", "./tui": "./tui.tsx", "./rpc": "./rpc.js" });
+assert.equal(quotaManifest.dependencies, undefined, "Account Quota no instala dependencias");
+assert.deepEqual(readdirSync(quotaRoot).sort(), [
+  "claude.js", "codex.js", "deepseek.js", "index.js", "inventory.js", "package.json", "preferences.js",
+  "routing.js", "rpc.js", "rules.js", "server.js", "sync.js", "tui.tsx", "view.js",
+]);
+for (const name of readdirSync(quotaRoot)) {
+  assert.doesNotMatch(readFileSync(join(quotaRoot, name), "utf8"), /\/home\/|\/Users\/|[A-Z]:\\Users\\/, `${name}: ruta personal`);
+}
+assert.equal(treeHash(quotaRoot), accountQuota.content_sha256, "Account Quota: la copia no coincide con la revisión fijada");
 const governance = readFileSync(new URL("../templates/skills/skill-governance/SKILL.md", import.meta.url), "utf8");
 assert.match(governance, /opencode\/autoinvoke: false/);
 const playwrightSkill = readFileSync(new URL("../templates/skills/playwright-cli/SKILL.md", import.meta.url), "utf8");
@@ -218,10 +240,14 @@ const thresholds = {
   "gpt-6-luna": 350000,
 };
 assert.deepEqual(Object.keys(models).sort(), [
-  ...Object.keys(thresholds), "gpt-6-luna-fast",
+  ...Object.keys(thresholds), "gpt-6-luna-fast", "gpt-image-2",
 ].sort());
+// El modelo de `experimental.image_generate` es de imagen: no tiene límites de contexto ni compacta.
+assert.equal(config.experimental.image_generate.model, "openai/gpt-image-2");
+assert.deepEqual(models["gpt-image-2"], { type: "image", package: "@opencode/ai/providers/openai/images", disabled: false });
 for (const [id, options] of Object.entries(models)) {
   assert.notEqual(options.disabled, true, `${id}: disponible`);
+  if (options.type === "image") continue;
   for (const [name, value] of Object.entries(options.limit)) {
     assert.ok(["context", "input", "output"].includes(name));
     assert.ok(Number.isInteger(value) && value > 0, `${id}: limit.${name}`);
@@ -232,4 +258,4 @@ for (const [id, options] of Object.entries(models)) {
   assert.equal(threshold, thresholds[id.replace(/-fast$/, "")], `${id}: umbral de compactación`);
 }
 
-console.log("OK: editores (carpetas y perfiles); subagentes (estados, orden y duración); Ponytail; Engram; skills y runtime fijados; permisos, modelos y títulos.");
+console.log("OK: editores (carpetas y perfiles); subagentes (estados, orden y duración); Ponytail; Engram; skills y runtime fijados; Account Quota fijado; permisos, modelos y títulos.");

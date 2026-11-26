@@ -1,5 +1,39 @@
 # Verificación del perfil Arch
 
+## Account Quota 1.0.0 — 26-11-2026
+
+OpenCode **2.4.2**. `templates/plugins/account-quota/` es la copia de los 14
+archivos de ejecución del proyecto Account Quota (revisión `9257ba83`); el hash
+de la copia, `ffcf86c9`, queda fijado en `arch/check.mjs`. La entrada de
+`templates/opencode.jsonc` activa sus dos opciones experimentales.
+
+- `node arch/check.mjs`: una sola entrada con sus opciones, ninguna en
+  `cli.json`, manifiesto `1.0.0` sin dependencias, lista exacta de archivos,
+  ninguna ruta personal y hash de la copia. Con el hash sin fijar, falla justo ahí.
+- `python arch/check-install.py`: instalación y reinstalación en Bash y Zsh, con
+  `verify.sh --config-dir` sobre el staging preparado. La lista de plugins
+  instalada coincide con la plantilla, y la copia, byte a byte.
+- Host real con HOME/XDG temporales y solo loopback: con la copia en
+  `plugins/account-quota` del directorio de configuración y la entrada literal de
+  la plantilla, el plugin queda `active` con servidor, TUI y RPC. Con un login
+  sintético de ChatGPT, la lectura de Codex queda disponible a petición; sin
+  opciones (control), no.
+- Retirada en staging: al quitar solo la entrada y la carpeta, `opencode.jsonc`
+  y `cli.json` quedan idénticos a la revisión anterior y los demás plugins siguen
+  registrados.
+
+No se ejecutó `install.sh` contra el HOME real ni `verify.sh --live`. La lectura
+con cuentas reales de Codex y Claude Code sigue sin probar.
+
+**Reconciliación con el perfil instalado.** Las plantillas incorporan lo que solo
+estaba en el perfil instalado: el modelo de imagen `gpt-image-2`, el tema
+`opencode-classic`, `scroll.acceleration: false` y `prompt.image_preview: true`.
+`arch/check.mjs` acepta modelos `type: "image"` sin límites. Tras aplicar a la
+plantilla las rutas de Engram y de skills que escribe el instalador, solo quedan
+tres diferencias, todas esperadas: la entrada de Account Quota (nueva), la de
+Herdr (la añade su integración) y `session.permissions`, que se mantiene en
+`prompt` por decisión del usuario (`autoaccept` se activa desde `Ctrl+P`).
+
 ## Editores de la TUI — 21-11-2026
 
 OpenCode **2.3.2**, TUI real en pseudoterminal, `--standalone` y HOME/XDG

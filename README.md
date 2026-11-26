@@ -13,6 +13,7 @@ y Ponytail **5.3.3**.
 | Ponytail oficial V2 | Paquete npm 5.3.3 fijado; `lite` automático y nivel persistente entre conversaciones |
 | subagent-statusline.v2 local | Estado y navegación de subagentes en la TUI |
 | Editores locales | `/open-zed` y `/open-vscode` abren carpetas desde la TUI sin llamar al modelo |
+| Account Quota 1.0.0 local | `/quota`: cuota y saldo de tus cuentas y orden de rutas; lectura experimental de Codex y Claude Code activada |
 | Herdr | Integración oficial automática si ya está instalado, estable >= 0.9.1 |
 | Documentos, presentaciones y diagramas | `document-files`, `presentation-slides` y `diagram-design`; [arquitectura para presentar o editar](docs/calidad-visual.md) |
 | Desarrollo web | `frontend-design` para diseño visual; `modern-web-guidance` para HTML, CSS, APIs del navegador, accesibilidad y compatibilidad. Guías locales, sin telemetría |
@@ -94,8 +95,11 @@ VS Code estable para Linux (`Code/User/globalStorage/storage.json`).
   acotadas. Los comandos de test/build se autorizan por proyecto mediante
   `permissions` o «Allow always». Cambiar el modo desde `Ctrl+P` afecta a la TUI
   global; no hay un `autoaccept` de TUI por proyecto.
-- Preferencias TUI: tema oscuro, razonamiento oculto, contadores de tokens,
-  `prompt.editor: false` y navegación de páginas con `<leader>k` / `<leader>j`.
+- Preferencias TUI: tema `opencode-classic` oscuro, razonamiento oculto, contadores de tokens,
+  `prompt.editor: false`, vista previa de imágenes en el prompt, desplazamiento sin
+  aceleración y navegación de páginas con `<leader>k` / `<leader>j`.
+- `gpt-image-2` queda declarado como modelo de imagen de OpenAI para
+  `experimental.image_generate`; no compacta ni tiene límites de contexto.
 - Solo se anuncian las skills integradas permitidas, las administradas y las seis de Ponytail;
   otras copias globales o de compatibilidad quedan ocultas hasta autorizarlas.
 - Se prioriza código fuente; leer dependencias y artefactos requiere confirmación.

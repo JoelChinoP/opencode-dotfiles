@@ -183,6 +183,11 @@ with (Path.home() / "npm-calls").open("a") as stream:
             assert cli["session"]["permissions"] == "prompt"
             assert cli["debug"]["turn_tokens"] is True
             assert cli["plugins"] == ["./plugins/subagent-statusline.v2", "./plugins/open-editor", "./plugins/image-preview"] + (["./herdr-opencode"] if shell == "zsh" else [])
+            # Account Quota: su única entrada (con opciones) y su copia de ejecución llegan intactas en cada instalación.
+            config = json.loads((config_dir / "opencode.jsonc").read_text())
+            assert config["plugins"] == json.loads((root / "templates/opencode.jsonc").read_text())["plugins"]
+            assert {p.name: p.read_bytes() for p in (config_dir / "plugins/account-quota").iterdir()} == {
+                p.name: p.read_bytes() for p in (root / "templates/plugins/account-quota").iterdir()}
             if shell == "zsh":
                 assert (config_dir / "herdr-opencode/tui.js").is_file()
                 assert len((home / "herdr-calls").read_text().splitlines()) == installation + 1
@@ -279,4 +284,4 @@ with (Path.home() / "npm-calls").open("a") as stream:
             assert "falló la integración opcional de Herdr" in result.stderr
             subprocess.run(["bash", str(root / "arch/verify.sh")], env=env, cwd=home, check=True, capture_output=True, text=True)
 
-print("OK: skills y Playwright fijados, oc/oc-last, respaldos, loopback, Ponytail lite, Herdr opcional, prevalidación y restauración.")
+print("OK: skills y Playwright fijados, oc/oc-last, respaldos, loopback, Ponytail lite, Account Quota, Herdr opcional, prevalidación y restauración.")
